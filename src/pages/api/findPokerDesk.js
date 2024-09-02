@@ -1,5 +1,5 @@
 import dbConnect from '@/config/dbConnect';
-import PokerDesk from '@/models/PokerDesk';
+import PokerDesk from '../../models/pokerDesk';
 import { verifyToken } from '@/utils/jwt';
 import mongoose from 'mongoose';
 

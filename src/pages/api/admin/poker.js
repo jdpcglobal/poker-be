@@ -1,5 +1,5 @@
 import dbConnect from '../../../config/dbConnect';
-import Poker from '../../../models/Poker';
+import Poker from '../../../models/poker';
 
 export default async function handler(req, res) {
   await dbConnect();
