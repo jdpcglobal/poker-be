@@ -1,6 +1,6 @@
  
-import dbConnect  from '../../../../config/dbConnect.js';
-import PokerMode from '../../../../models/pokerMode.js';
+import dbConnect  from '../../../../config/dbConnect';
+import PokerMode from '../../../../models/pokerMode';
 
 export default async function handler(req, res) {
   const { method, query } = req;
