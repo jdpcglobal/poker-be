@@ -34,6 +34,7 @@ export default async function handler(req, res) {
 
         const formattedPokerModes = pokerModes.map(mode => {
           const commonData = {
+            pokerModeId : mode._id,
             minBuyIn: mode.minBuyIn,
             maxBuyIn: mode.maxBuyIn,
             maxPlayer: mode.maxPlayerCount,

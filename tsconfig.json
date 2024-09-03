@@ -21,6 +21,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/pages/api/auth/requeastOtp.js", "src/config/dbConnect.js", "src/utils/modelTypes.JS"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/pages/api/auth/requeastOtp.js", "src/config/dbConnect.js", "src/utils/modelTypes.JS", "src/models/pokerMode.js", "src/models/poker.js", "src/models/pokerDesk.js", "src/models/pokerMode.js"],
   "exclude": ["node_modules"]
 }
