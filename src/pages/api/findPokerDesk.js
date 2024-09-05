@@ -56,6 +56,7 @@ export default async function handler(req, res) {
         message: 'Best table found',
       });
     } catch (error) {
+      
       res.status(500).json({ message: 'Internal server error', error });
       console.log(error);
     }
