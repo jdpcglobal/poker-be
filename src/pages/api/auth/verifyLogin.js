@@ -36,5 +36,5 @@ export default async function handler(req, res) {
 
   await Otp.deleteOne({ mobileNumber }); // Delete OTP after verification
 
-  return res.status(200).json({ message: 'Login successful', token, userName: user.username});
+  return res.status(200).json({ message: 'Login successful', token, userName: user.username, userId:user._id});
 }
