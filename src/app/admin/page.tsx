@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link';
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-
+import useSocket from '../../hooks/useSocket'
 interface Poker {
   _id: string;
   name: string;
@@ -27,7 +27,7 @@ const PokerAdmin: React.FC = () => {
   const [editingPoker, setEditingPoker] = useState<Partial<Omit<Poker, '_id'>> | null>(null);
   const [editingPokerId, setEditingPokerId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-
+   const socket = useSocket("tattvamasi");
   useEffect(() => {
     // Fetch existing poker games from your backend
     fetch('/api/admin/poker')
