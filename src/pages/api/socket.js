@@ -200,7 +200,7 @@ export default function handler(req, res) {
     
           // Handle the player action using PokerGame's methods
           await pokerGame.handlePlayerAction(userId, action, amount);
-    
+          
           // Broadcast the updated game state to the room
           await updateGameForRoom(io, gameId);
         } catch (error) {
