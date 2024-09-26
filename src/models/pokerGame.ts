@@ -48,7 +48,6 @@ interface IPokerGame extends Document {
   players: IPlayer[];
   currentTurnPlayer: mongoose.Types.ObjectId | null;
   pot: number;
-  minimumBet: number;
   status: 'waiting' | 'in-progress' | 'finished';
   rounds: IRound[];
   communityCards: ICard[];
@@ -83,7 +82,6 @@ const PokerGameSchema = new Schema<IPokerGame>({
   }],
   currentTurnPlayer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   pot: { type: Number, default: 0 },
-  minimumBet: { type: Number, default: 0 },
   status: { type: String, enum: ['waiting', 'in-progress', 'finished'], default: 'in-progress' },
   rounds: [{
     name: { type: String, enum: ['pre-flop', 'flop', 'turn', 'river', 'showdown'] },
@@ -186,7 +184,6 @@ PokerGameSchema.statics.createGameFromTable = async function (pokerDeskId: mongo
     pokerDeskId,
     players: activePlayers,
     status: 'in-progress',
-    minimumBet: bigBlindAmount,  // Set the minimum bet to big blind amount
     pot: initialPot,  // Start pot with the SB + BB
     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,  // Set to next player after BB, or fallback to SB if only 2 players
     sidePots: [],
@@ -216,43 +213,38 @@ PokerGameSchema.statics.createGameFromTable = async function (pokerDeskId: mongo
   return newGame;
 };
 
-PokerGameSchema.methods.dealCards = function (count: number, cardType: 'hole' | 'community' = 'community'): ICard[] {
-  // Helper function to generate and shuffle a full deck of cards
- 
+PokerGameSchema.methods.dealCards = function (
+  count: number,
+  cardType: 'hole' | 'community' = 'community'
+): ICard[] {
   // Get all cards already dealt (hole cards and community cards)
   const usedCards = new Set<string>(
     this.players
-      .flatMap(player => player.holeCards)  // Collect hole cards of all players
-      .concat(this.communityCards)          // Combine with community cards
+      .flatMap(player => player.holeCards) // Collect hole cards of all players
+      .concat(this.communityCards) // Combine with community cards
       .map(card => `${card.rank}${card.suit}`) // Convert to a string representation for easy comparison
   );
 
   // Generate a full shuffled deck and filter out already dealt cards
-  let deck = generateDeck().filter(card => !usedCards.has(`${card.rank}${card.suit}`));
+  let deck = generateDeck().filter(
+    card => !usedCards.has(`${card.rank}${card.suit}`)
+  );
 
   const dealtCards: ICard[] = [];
 
   // Deal the required number of cards
   while (dealtCards.length < count) {
-    dealtCards.push(deck.pop()!);  // Get the top card from the shuffled and filtered deck
+    dealtCards.push(deck.pop()!); // Get the top card from the shuffled and filtered deck
   }
 
-  if (cardType === 'hole') {
-    // Handle hole cards (assign to players)
-    // this.players.forEach(player => {
-    //   if (player.holeCards.length === 0) {
-    //     player.holeCards = dealtCards.splice(0, 2); // Deal 2 hole cards per player
-    //   }
-    // });
-  } else if (cardType === 'community') {
-    // Handle community cards
-    this.communityCards.push(...dealtCards);
-  }
+  // Do not automatically push cards to `communityCards` or `holeCards`.
+  // This will be handled explicitly in `startNextRound` or other game methods.
 
-  // Save the updated game state
-  this.save();
+  // Save the updated game state if necessary here
+  // await this.save();
   return dealtCards;
 };
+
 
 PokerGameSchema.methods.getNextActivePlayer = function (currentUserId: mongoose.Types.ObjectId): mongoose.Types.ObjectId | null {
   // Get the index of the current player
@@ -390,16 +382,16 @@ PokerGameSchema.methods.startNextRound = async function (prevRoundName?: 'pre-fl
       this.communityCards.push(...this.dealCards(1, 'community'));
       break;
     case 'showdown':
-        this.showdown();
+        await this.showdown();
       return;
     default:
       throw new Error('Invalid round name.');
   }
 
   // Reset players' total bet for the new roun
-   this.currentTurnPlayer = this.getFirstActivePlayer();
+   this.currentTurnPlayer = await this.getFirstActivePlayer();
   // Save the updated game state
-  //await this.save();
+  await this.save();
 };
 
 PokerGameSchema.methods.handlePlayerAction = async function (userId: mongoose.Types.ObjectId, action: PlayerAction, amount: number = 0) {
@@ -474,7 +466,6 @@ PokerGameSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   
     if (player.balanceAtTable < amount) throw new Error('Insufficient balance to raise.');
   
-    this.minimumBet = amount;
     player.balanceAtTable -= amount;
     player.totalBet += amount;
     this.pot += amount;
@@ -497,9 +488,9 @@ PokerGameSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     throw new Error('Invalid action.');
   }
   currentRound.actions.push(newAction);
-  // Save the updated game statenpm
- // await this.save();
-
+  //Save the updated game statenpm
+  await this.save();
+   console.log("we called first save action successfully");
   const activePlayers = this.players.filter(p => p.status === 'active'); // Assuming players are stored in this.players
 
   if (activePlayers.length <= 1) {
@@ -510,92 +501,132 @@ PokerGameSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
    // Add any additional logic needed here (e.g., end the game, announce the winner, etc.)
   } else {
 
-     const actionPlayerIds = new Set(currentRound.actions.map(action => action.userId));
+   // Convert the user IDs in the actions to strings and store them in a Set
+const actionPlayerIds = new Set(
+  currentRound.actions.map(action => action.userId.toString())
+);
+console.log("actionPlayerIds", actionPlayerIds);
 
-      // Get the next active player's ID
-      const nextPlayerId = await this.getNextActivePlayer(userId);
+// Get the next active player's ID
+const nextPlayerId = await this.getNextActivePlayer(userId);
+console.log("nextPlayerId", nextPlayerId);
 
-      // Check if the next player has already placed an action
-     const nextPlayerHasActed = actionPlayerIds.has(nextPlayerId);
-     console.log("nextPlayerHasActed",nextPlayerId);
-     console.log("nextPlayerHasActed",nextPlayerHasActed);
-     console.log("actionPlayerIds",actionPlayerIds);
-    if (nextPlayerHasActed) {
+// Convert nextPlayerId to string for comparison
+const nextPlayerIdStr = nextPlayerId.toString();
+
+// Check if the next player has already placed an action
+const nextPlayerHasActed = actionPlayerIds.has(nextPlayerIdStr);
+console.log("nextPlayerHasActed", nextPlayerIdStr);
+console.log("nextPlayerHasActed", nextPlayerHasActed);
+console.log("actionPlayerIds", actionPlayerIds);
+
+    if (!nextPlayerHasActed) {
       console.log('Round is not complete, waiting for all active players to act.');
       // Continue with the game logic, wait for more actions
        // Continue with the game logic
        this.currentTurnPlayer = nextPlayerId;
-    }else{
-
+       await this.save();
+    }
+    else {
+      // Calculate the total bet amounts for each player
       const totalBets = currentRound.actions.reduce((acc, action) => {
         const { userId, amount } = action;
-      console.log(" we are here ");
         // Only consider actions with a positive amount
-        if (amount > 0) {
-          acc[userId] = (acc[userId] || 0) + amount; // Initialize and sum the amounts for each user
+        if (amount >= 0) {
+          acc[userId.toString()] = (acc[userId.toString()] || 0) + amount; // Initialize and sum the amounts for each user
         }
         return acc;
-      }, {});
-      
+      }, {} as Record<string, number>);
+
+     console.log("totalBets",totalBets);
       // Get unique total bet values
       const uniqueBets = new Set(Object.values(totalBets));
-      
+      console.log("uniqueBets",uniqueBets);
+      // Get unique total bet values
       // Check if all active players have bet the same amount
       if (uniqueBets.size === 1) {
-        console.log("again we are here in uniqebets ");
-        const sortedPlayers = currentRound.actions
-          .filter(action => totalBets[action.userId] > 0)
-          .map(action => ({
-              userId: action.userId,
-              totalBet: totalBets[action.userId],
-              lastAction: action.action
-          }))
-          .sort((a, b) => a.totalBet - b.totalBet);
+        console.log("All players have equal total bets.");
     
+        // Create a unique set of players based on userId and their total bet
+        const uniquePlayers = Object.entries(totalBets).map(([userId, totalBet]) => {
+          // Find the last action of the player in the current round
+          const lastAction = currentRound.actions
+            .filter(action => action.userId.toString() === userId)
+            .pop()?.action || 'no-action'; // Fallback if no actions are found
+    
+          return {
+            userId: new mongoose.Types.ObjectId(userId), // Ensure ObjectId format
+            totalBet,
+            lastAction
+          };
+        });
+        console.log("uniquePlayers",uniquePlayers)
+        // Sort players by their total bets
+        const sortedPlayers = uniquePlayers.sort((a, b) => a.totalBet - b.totalBet);
+        console.log("sortedPlayers",sortedPlayers)
+
         let remainingPlayers = [...sortedPlayers];
     
         while (remainingPlayers.length > 0) {
-            const minBet = remainingPlayers[0].totalBet;
-            const playersWithMinBet = remainingPlayers.filter(player => player.totalBet === minBet);
-            const playersWithHigherBets = remainingPlayers.filter(player => player.totalBet > minBet);
+          const minBet = remainingPlayers[0].totalBet;
+          const playersWithMinBet = remainingPlayers.filter(
+            (player) => player.totalBet === minBet
+          );
+          const playersWithHigherBets = remainingPlayers.filter(
+            (player) => player.totalBet > minBet
+          );
     
-            let sidePot = this.sidePots.find(pot => {
-                const potPlayers = pot.players.map(id => id.toString());
-                const currentPlayers = playersWithMinBet.map(player => player.userId.toString());
-                return potPlayers.length === currentPlayers.length && potPlayers.every(id => currentPlayers.includes(id));
-            });
-    
-            if (!sidePot) {
-                sidePot = {
-                    amount: 0,
-                    players: playersWithMinBet.map(player => player.userId),
-                };
-                this.sidePots.push(sidePot);
-            }
-    
-            playersWithMinBet.forEach(player => {
-                sidePot.amount += minBet;
-            });
-    
-            remainingPlayers = playersWithHigherBets.map(player => ({
-                ...player,
-                totalBet: player.totalBet - minBet,
-            }));
+          // Find or create the side pot for the players with the minimum bet
+          let sidePot = this.sidePots.find((pot) => {
+            const potPlayers = pot.players.map((id) => id.toString());
+            const currentPlayers = playersWithMinBet.map((player) =>
+              player.userId.toString()
+            );
+            return (
+              potPlayers.length === currentPlayers.length &&
+              potPlayers.every((id) => currentPlayers.includes(id))
+            );
+          });
+          const contributionAmount = minBet * playersWithMinBet.length;
+          // Create a new side pot if none exists for the current set of players
+          if (!sidePot) {
+            sidePot = {
+              amount: contributionAmount,
+              players: Array.from(new Set(playersWithMinBet.map((player) => player.userId))), // Ensure unique players
+            };
+            this.sidePots.push(sidePot);
+          } else { 
+            // Update players in the existing side pot ensuring no duplicates
+            const uniquePlayers = new Set([
+              ...sidePot.players.map((id) => id.toString()),
+              ...playersWithMinBet.map((player) => player.userId.toString()),
+            ]);
+            sidePot.players = Array.from(uniquePlayers).map((id) => new mongoose.Types.ObjectId(id));
+            sidePot.amount += contributionAmount;
+          }
+     
+          // Update remaining players' bets and remove those who have matched the minimum
+          remainingPlayers = playersWithHigherBets.map((player) => ({
+            ...player,
+            totalBet: player.totalBet - minBet,
+          }));
         }
     
-       // await this.save();
-       await this.startNextRound(currentRound.name);
-    }
-     else {
-        console.log('Round is not complete, active players have different contributions.');
-        // Continue with the game logic, e.g., moving to the next player
+        // Continue with the game logic
+        await this.startNextRound(currentRound.name);
+      } else {
+        console.log(
+          "Round is not complete, active players have different contributions."
+        );
+        // Handle the case when players' contributions differ
         this.currentTurnPlayer = nextPlayerId;
-       // await this.save();
       }
     }
   } 
 
-  await this.save();
+ // await this.save();
+ //await this.constructor.findOneAndUpdate({ _id: this._id }, this, { new: true });
+
   // Check if the round is complete after this action
  // await this.checkIfRoundComplete();
 };
