@@ -1,16 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import PokerDesk from './pokerDesk';
 import { IPokerTable } from './pokerDesk';
-import { Hand as PokerHand, Hand } from 'pokersolver';
+import {evaluateSidePots,evaluateHands} from '../utils/pokerHand';
 
 // Define types for player status, actions, and card suits/ranks
 type PlayerStatus = 'active' | 'all-in' | 'folded' | 'sitting-out';
 type PlayerAction = 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'small-blind' |"big-blind";
 
-interface IHand {
-  userId: mongoose.Types.ObjectId;
-  hand: Hand;
-}
+ 
 interface ICard {
   suit: 'hearts' | 'diamonds' | 'clubs' | 'spades';
   rank: '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -754,37 +751,43 @@ PokerGameSchema.methods.showdown = async function () {
     player.status === 'active' || player.status === 'all-in'
   );
 
-  // Evaluate hands
-  const playerHands = eligiblePlayers.map(player => {
-    const playerHand = [...player.holeCards, ...this.communityCards];
-    const hand = PokerHand.solve(playerHand);
-    return { userId: player.userId, hand };
-  });
-
-  // Determine the best hand(s)
-  const bestHand = PokerHand.winner(playerHands.map(ph => ph.hand));
-
-  // Determine winners based on the best hand
-  const winners = playerHands.filter(ph => ph.hand === bestHand);
+  // Evaluate hands for eligible players
+  const playerHands = evaluateHands(eligiblePlayers, this.communityCards);
+  console.log(`playerHands`, playerHands);
 
   // Distribute winnings from each side pot
+  const sidePotResults = evaluateSidePots(eligiblePlayers, this.communityCards, this.sidePots);
+  console.log("Side Pot Results", sidePotResults);
+
   for (const sidePot of this.sidePots) {
-    const { amount, players } = sidePot;
+    const { winners, rankings } = sidePotResults[`SidePot ${sidePot.amount}`];
 
-    // Filter players to include only those who are winners
-    const winningPlayers = players.filter(playerId => 
-      winners.some(winner => winner.userId.equals(playerId))
-    );
+    // Log rankings for the current side pot
+    console.log(`Rankings for SidePot ${sidePot.amount}:`, rankings);
+    console.log(`winners for SidePot ${sidePot.amount}:`, winners);
 
-    // If there are winning players, distribute the pot
-    if (winningPlayers.length > 0) {
-      const individualShare = amount / winningPlayers.length;
+    // If there are winning players, determine the actual winner
+    if (rankings.length > 0) {
+      // Sort rankings to find the highest-ranked hand
+      rankings.sort((a, b) => {
+        if (a.handRank !== b.handRank) {
+          return b.handRank - a.handRank; // higher handRank is better
+        }
+        return b.highCard - a.highCard; // Higher highCard is better
+      });
+
+      const topRanking = rankings[0];
+      const topWinners = rankings.filter(rank => rank.handRank === topRanking.handRank && rank.highCard === topRanking.highCard);
+      
+      const individualShare = sidePot.amount / topWinners.length;
+      console.log(`individualShare`, individualShare);
 
       // Update each winning player's balance
-      for (const playerId of winningPlayers) {
-        const player = this.players.find(p => p.userId.equals(playerId));
+      for (const rank of topWinners) {
+        const player = this.players.find(p => p.userId.equals(rank.playerId));
         if (player) {
           player.balanceAtTable += individualShare; // Distribute winnings
+          console.log(`Updated balance for playerId ${rank.playerId}:`, player.balanceAtTable);
         }
       }
     }
@@ -793,77 +796,11 @@ PokerGameSchema.methods.showdown = async function () {
   // Set the game status to finished
   this.status = 'finished';
 
-  // Optionally clear side pots and community cards after the showdown
-  // this.sidePots = [];
-  // this.communityCards = [];
-
   // Save the updated game state to the database
- // await this.save();
+  await this.save();
 };
+ 
 
-// // Method to handle the showdown
-// PokerGameSchema.methods.showdown = async function () {
-//   const activePlayers = this.players.filter(p => p.status === 'active' || p.status === 'all-in');
-
-//   // Show each player's hole cards
-//   activePlayers.forEach(player => {
-//     console.log(`Player ${player.userId} hole cards:`, player.holeCards);
-//   });
-
-//   this.distributeWinnings();
-// };
-
-// // Method to distribute winnings
-// PokerGameSchema.methods.distributeWinnings = async function () {
-//   const mainPotWinners = this.determineWinners();
-//   const totalPot = this.pot;
-  
-//   if (mainPotWinners.length > 0) {
-//     const share = totalPot / mainPotWinners.length;
-//     mainPotWinners.forEach(winner => {
-//       const player = this.players.find(p => p.userId.equals(winner.userId));
-//       if (player) player.balanceAtTable += share;
-//     });
-//   }
-
-//   // Distribute side pots
-//   this.sidePots.forEach(sidePot => {
-//     const sidePotWinners = this.determineWinners(); // Get winners again based on the side pot context
-    
-//     if (sidePotWinners.length > 0) {
-//       const sidePotShare = sidePot.amount / sidePotWinners.length;
-//       sidePotWinners.forEach(winner => {
-//         const player = this.players.find(p => p.userId.equals(winner.userId));
-//         if (player) player.balanceAtTable += sidePotShare;
-//       });
-//     }
-//   });
-
-//   // this.pot = 0;
-//   // this.sidePots = [];
-//   this.status = 'finished';
-
-//   const pokerDesk = await PokerDesk.findById(this.pokerDeskId);
-//   if (pokerDesk) {
-//     this.players.forEach(player => {
-//       const seat = pokerDesk.seats.find(seat => seat.userId.equals(player.userId));
-//       if (seat) {
-//         seat.balanceAtTable += player.balanceAtTable; // Return the balance to the seat
-//         player.balanceAtTable = 0; // Reset player's game balance
-//       }
-//     });
-
-//     // Save the updated table
-//     await pokerDesk.save();
-//   }
-
-//   // Call createGameFromTable to start a new game
-   
-//   this.createGameFromTable(this.pokerDeskId)
-  
-// };
-
-
- const PokerGame = mongoose.model<IPokerGame>('PokerGame', PokerGameSchema);
+const PokerGame = mongoose.model<IPokerGame>('PokerGame', PokerGameSchema);
 
  export default PokerGame;
