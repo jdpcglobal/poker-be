@@ -83,9 +83,10 @@ const updateTableForRoom = async (io, tableId) => {
         })),
         communityCards: pokerGame.communityCards,
         pot: pokerGame.pot,
-        minimumBet: pokerGame.minimumBet,
+        sidePots: pokerGame.sidePots,
         status: pokerGame.status,
-        rounds: pokerGame.rounds,
+        currentTurnPlayer: pokerGame.currentTurnPlayer,
+        currentRound: pokerGame.rounds[pokerGame.rounds.length - 1]
       });
   
       console.log(`Game ${gameId} data sent to room`);

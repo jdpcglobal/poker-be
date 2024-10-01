@@ -456,7 +456,7 @@ PokerGameSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   } else if (action === 'raise') {
     // Set the default raise amount to 25% of the current pot
     const minRaiseAmount =  Math.ceil(this.pot * 0.25);
-  
+    console.log('minimum raise amount is this',minRaiseAmount)
     if ( amount <= callAmount || amount < minRaiseAmount) {
       throw new Error(`Raise amount must be greater than or equal to ${minRaiseAmount}.`);
     }
@@ -617,6 +617,7 @@ console.log("actionPlayerIds", actionPlayerIds);
         );
         // Handle the case when players' contributions differ
         this.currentTurnPlayer = nextPlayerId;
+        await this.save();
       }
     }
   } 
