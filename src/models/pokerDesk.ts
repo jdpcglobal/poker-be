@@ -230,11 +230,17 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerG
     player.holeCards = [deck.pop()!, deck.pop()!]; // Deal 2 cards to each player
   });
 
+  const defaultSidePot: ISidePot = {
+    amount: initialPot,  // Initial amount from the SB and BB
+    players: activePlayers.map(player => player.userId), // Include all players
+  };
+  console.log("defaultSidePo",defaultSidePot);
   // Create a new game object
   const newGame = {
     players: activePlayers,
     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId, // Set next player
     pot: initialPot,
+    sidePots: [defaultSidePot],
     status: 'in-progress',
     rounds: [{
       name: 'pre-flop',
@@ -244,8 +250,7 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerG
         { userId: activePlayers[1].userId, action: 'big-blind', amount: bigBlindAmount },
       ],
     }],
-    communityCards: [],
-    sidePots: [],
+    communityCards: [], 
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -657,19 +662,32 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     throw new Error('No round in progress');
   }
 
-  let playerTotalBet;
-  let maxBet;
-  let totalBet;
-
-  if (currentRound.actions && currentRound.actions.length > 0) {
-    totalBet = currentRound.actions.reduce((total, action) => total + action.amount, 0);
-    playerTotalBet = currentRound.actions.filter(action => action.userId.equals(userId)).reduce((total, action) => total + action.amount, 0);
-    maxBet = Math.max(...currentRound.actions.map(action => action.amount));
-  } else {
-    playerTotalBet = 0;
-    maxBet = 0;
-    totalBet = 0;
-  }
+  let playerTotalBet = 0; // Total bet of the current player
+  let maxBet = 0; // Maximum bet from any player
+  let totalBet = 0; // Total bets in the current round
+  
+  // Check if currentRound exists and has actions
+  if (currentRound?.actions?.length) {
+      // Step 1: Map player bets and calculate total bets in a single pass
+      const playerBets = currentRound.actions.reduce((acc, action) => {
+          // Aggregate each player's bets
+          acc[action.userId] = (acc[action.userId] || 0) + action.amount;
+  
+          // Update maxBet directly during the reduction
+          maxBet = Math.max(maxBet, acc[action.userId]);
+  
+          return acc;
+      }, {});
+  
+      // Total bets can be derived from the values of playerBets
+      
+    //  totalBet = Object.values(playerBets).reduce((total, bet) => total + bet, 0);
+      
+      // Get the current player's total bet
+      playerTotalBet = playerBets[userId] || 0; // Default to 0 if the user has no bets
+  
+      console.log("Player Bets:", playerBets); // Debugging player bets
+  }  
   
  // const callAmount = maxBet - playerTotalBet;
   const callAmount = Math.max(0, maxBet - playerTotalBet); // Avoid negative call amounts
@@ -685,8 +703,9 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   };
 
   if (action === 'fold') {
-    player.status = 'folded';
-    newAction.action = 'fold';
+    playerSeat.status = 'folded';
+    newAction.action = 'fold'; 
+
   } else if (action === 'check') {
     if (totalBet === 0) {
       newAction.action = 'check';
@@ -700,7 +719,7 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
 
     player.balanceAtTable -= callAmount;
     playerSeat.balanceAtTable -= callAmount;
-    player.totalBet += callAmount;
+    playerSeat.totalBet += callAmount;
     this.currentGame.pot += callAmount;
 
     newAction.action = 'call';
@@ -709,8 +728,9 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   } else if (action === 'raise') {
     // Set the default raise amount to 25% of the current pot
     const minRaiseAm =  Math.ceil(this.currentGame.pot * 0.25);
-    let minRaiseAmount =  callAmount + minRaiseAm;
-    if (amount <= callAmount || amount <= minRaiseAmount) {
+    let minRaiseAmount =  callAmount + minRaiseAm ;
+    console.log(minRaiseAmount);
+    if (amount < minRaiseAmount || amount < callAmount ) {
       throw new Error(`Raise amount must be greater than or equal to ${minRaiseAmount}.`);
        
     }
@@ -718,7 +738,7 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     if (player.balanceAtTable < amount) throw new Error('Insufficient balance to raise.');
 
     player.balanceAtTable -= amount;
-    player.totalBet += amount;
+    playerSeat.totalBet += amount;
     playerSeat.balanceAtTable -= amount;
     this.currentGame.pot += amount;
 
@@ -727,10 +747,11 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
 
   } else if (action === 'all-in') {
     // Player goes all-in with whatever balance they have left
+     
     const allInAmount = player.balanceAtTable;
-    player.status = 'all-in';
+    playerSeat.status = 'all-in';
     player.balanceAtTable = 0;
-    player.totalBet += allInAmount;
+    playerSeat.totalBet += allInAmount;
     playerSeat.balanceAtTable -= allInAmount;
     this.currentGame.pot += allInAmount;
 
@@ -742,9 +763,10 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   }
 
   currentRound.actions.push(newAction);
-
+ // await this.save();
   const activePlayers = this.currentGame.players.filter(p => p.status === 'active');
-
+   console.log("activePlayers kength",activePlayers.length );
+   console.log("activePlayers",activePlayers);
   if (activePlayers.length <= 1) {
     // Handle the situation where there's one or no active players
     await this.showdown(); // Call showdown method on currentGame
