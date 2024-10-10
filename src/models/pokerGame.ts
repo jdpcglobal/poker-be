@@ -126,7 +126,6 @@ const generateDeck = (): ICard[] => {
   return deck;
 };
 
-
 // Static method to create a new poker game from a poker desk
 PokerGameSchema.statics.createGameFromTable = async function (pokerDeskId: mongoose.Types.ObjectId): Promise<IPokerGame> {
   const pokerDesk: IPokerTable | null = await PokerDesk.findById(pokerDeskId);
@@ -227,12 +226,19 @@ PokerGameSchema.methods.dealCards = function (
     card => !usedCards.has(`${card.rank}${card.suit}`)
   );
 
+  // Fisher-Yates shuffle (to ensure a truly random shuffle)
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
   const dealtCards: ICard[] = [];
 
   // Deal the required number of cards
-  while (dealtCards.length < count) {
+  while (dealtCards.length < count && deck.length > 0) {
     dealtCards.push(deck.pop()!); // Get the top card from the shuffled and filtered deck
   }
+
 
   // Do not automatically push cards to `communityCards` or `holeCards`.
   // This will be handled explicitly in `startNextRound` or other game methods.
@@ -272,52 +278,6 @@ PokerGameSchema.methods.getFirstActivePlayer = function (): mongoose.Types.Objec
   return null; // No active players found
 };
 
-// PokerGameSchema.methods.startRound = async function (roundName: 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown') {
-//   // Check if the round has already started
-//   if (this.rounds.some(round => round.name === roundName)) {
-//     throw new Error('Round already started.');
-//   }
-
-//   // Add the new round to the rounds array
-//   const newRound: IRound = {
-//     name: roundName,
-//     bettingRoundStartedAt: new Date(),
-//     actions:[],
-//   };
-//   this.rounds.push(newRound);
-
-//   // Handle card dealing based on the round name
-//   switch (roundName) {
-//     case 'pre-flop':
-//       // Deal hole cards at the start of the pre-flop round
-//       this.dealCards(this.players.length * 2, 'hole'); // 2 cards per player
-//       break;
-//     case 'flop':
-//       // Deal 3 community cards
-//       this.communityCards.push(...this.dealCards(3, 'community'));
-//       break;
-//     case 'turn':
-//     case 'river':
-//       // Deal 1 community card (turn or river)
-//       this.communityCards.push(...this.dealCards(1, 'community'));
-//       break;
-//     case 'showdown':
-//       // No community cards dealt during the showdown; just prepare for the showdown phase
-//       this.showdown();
-//       return; 
-//     default:
-//       throw new Error('Invalid round name.');
-//   }
-    
-//   this.currentT
-//   // Reset players' total bet for the new round
-//   // this.players.forEach(player => {
-//   //   player.totalBet = 0;
-//   // });
-
-//   // Save the updated game state
-//   await this.save();
-// };
 
 
 PokerGameSchema.methods.startNextRound = async function (prevRoundName?: 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown') {
@@ -630,117 +590,6 @@ console.log("actionPlayerIds", actionPlayerIds);
 };
 
 
-// PokerGameSchema.methods.determineWinners = function () {
-//   const communityCards = this.communityCards; // The community cards on the table
-
-//   // Filter out players who folded
-//   const activePlayers = this.players.filter(player => player.status === 'active' || player.status === 'all-in');
-
-//   // Prepare player hands
-//   const playerHands = activePlayers.map(player => {
-//     const cards = [...communityCards, ...player.holeCards].map(card => `${card.rank}${card.suit[0]}`);
-//     return {
-//       userId: player.userId,
-//       hand: Hand.solve(cards)
-//     };
-//   });
-
-//   // Determine the best hand
-//   const bestHand = Hand.winners(playerHands.map(player => player.hand));
-
-//   // Return the winning player(s)
-//   const winners = playerHands.filter(player => bestHand.includes(player.hand));
-//   return winners.map(winner => ({ userId: winner.userId, hand: winner.hand }));
-// };
-
-// PokerGameSchema.methods.updatePotAndPlayerBalances = async function (userId: mongoose.Types.ObjectId, betAmount: number) {
-//   const player = this.players.find(p => p.userId.equals(userId));
-
-//   if (!player) {
-//     throw new Error('Player not found.');
-//   }
-
-//   if (player.balanceAtTable < betAmount) {
-//     throw new Error('Insufficient balance to make this bet.');
-//   }
-
-//   // Deduct the bet amount from the player's balance
-//   player.balanceAtTable -= betAmount;
-
-//   // Add the bet amount to the player's total bet for the round
-//   player.totalBet += betAmount;
-
-//   // Add the bet amount to the pot
-//   this.pot += betAmount;
-
-//   await this.save(); // Save the updated state of the game
-
-// };
-
-// // Method to check if the round is complete and move to next round
-// PokerGameSchema.methods.checkIfRoundComplete = async function () {
-//   const activePlayers = this.players.filter(player => player.status === 'active' || player.status === 'all-in');
-//   const highestBet = Math.max(...this.players.map(player => player.totalBet));
-
-//   // Check if all active players have either matched the highest bet or are all-in
-//   const allBetsMatched = activePlayers.every(player => 
-//     player.totalBet === highestBet || player.status === 'all-in' || player.status === 'folded'
-//   );
-
-//   // Only start the next round when all bets are matched, or if all but one player folded
-//   if (allBetsMatched && activePlayers.length > 1) {
-//     // Move to the next round only when all conditions are met
-//     await this.startNextRound();
-//   } else {
-//     // Otherwise, move to the next player's turn
-//     this.currentTurnPlayer = this.getNextActivePlayer(this.currentTurnPlayer);
-//   }
-
-//   await this.save();
-// };
-
-// // Method to start the next round
-// PokerGameSchema.methods.startNextRound = async function () {
-//   const currentRound = this.rounds[this.rounds.length - 1].name;
-//   const roundMap: { [key: string]: 'flop' | 'turn' | 'river' | 'showdown' } = {
-//     'pre-flop': 'flop',
-//     'flop': 'turn',
-//     'turn': 'river',
-//     'river': 'showdown',
-//   };
-
-//   const nextRound = roundMap[currentRound];
-//   if (nextRound === 'showdown') {
-//     await this.showdown();
-//   } else {
-//     await this.startRound(nextRound);
-//   }
-// };
-
-// // Method to calculate side pots if players go all-in
-// PokerGameSchema.methods.createSidePots = function () {
-//   const sortedBets = this.players
-//     .filter(p => p.status === 'active' || p.status === 'all-in')
-//     .map(p => p.totalBet)
-//     .sort((a, b) => a - b);
-
-//   this.sidePots = [];
-
-//   sortedBets.forEach((bet, index) => {
-//     const playersInvolved = this.players
-//       .filter(p => (p.totalBet >= bet && (p.status === 'active' || p.status === 'all-in')))
-//       .map(p => p.userId);
-
-//     const sidePotAmount = bet * playersInvolved.length;
-
-//     this.sidePots.push({
-//       amount: sidePotAmount,
-//       players: playersInvolved,
-//     });
-//   });
-// };
-
-
 PokerGameSchema.methods.showdown = async function () {
   // Check if the game is in progress
   if (this.status !== 'in-progress') {
@@ -789,6 +638,7 @@ PokerGameSchema.methods.showdown = async function () {
         if (player) {
           player.balanceAtTable += individualShare; // Distribute winnings
           console.log(`Updated balance for playerId ${rank.playerId}:`, player.balanceAtTable);
+ 
         }
       }
     }
