@@ -11,9 +11,10 @@ const useSocket = (username) => {
     }
 
     // Initialize socket connection
-    const socketIo = io('http://192.168.1.7:3000', {
+    const socketIo = io('http://192.168.1.2:3000', {
       path: '/api/socket',
     });
+
 
     // Register with username when connected
     socketIo.on('connect', () => {

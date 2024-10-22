@@ -1,8 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import PokerDesk from './pokerDesk';
 import { IPokerTable } from './pokerDesk';
-import {evaluateSidePots,evaluateHands} from '../utils/pokerHand';
-
+import {evaluatePots,evaluateHands} from '../utils/pokerHand';
+import createPots from '../utils/createPots';
+import { IPot } from '@/utils/pokerTypes';
 // Define types for player status, actions, and card suits/ranks
 type PlayerStatus = 'active' | 'all-in' | 'folded' | 'sitting-out';
 type PlayerAction = 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'small-blind' |"big-blind";
@@ -40,7 +41,7 @@ interface ISidePot {
   players: mongoose.Types.ObjectId[];
 }
 
-interface IPokerGame extends Document {
+export interface IPokerGame extends Document {
   pokerDeskId: mongoose.Types.ObjectId;
   players: IPlayer[];
   currentTurnPlayer: mongoose.Types.ObjectId | null;
@@ -48,7 +49,7 @@ interface IPokerGame extends Document {
   status: 'waiting' | 'in-progress' | 'finished';
   rounds: IRound[];
   communityCards: ICard[];
-  sidePots: ISidePot[];
+  pots: IPot[]; // Updated from sidePots to pots
   createdAt: Date;
   updatedAt: Date;
 
@@ -59,7 +60,7 @@ interface IPokerGame extends Document {
   startNextRound(roundName?: 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown'): Promise<void>;
   handlePlayerAction(userId: mongoose.Types.ObjectId, action: PlayerAction, amount?: number): Promise<void>;
   showdown(): Promise<void>;
-  createSidePots(): void;
+  // Removed createSidePots() as it's no longer necessary
 }
 
 
@@ -93,13 +94,18 @@ const PokerGameSchema = new Schema<IPokerGame>({
     suit: { type: String, enum: ['hearts', 'diamonds', 'clubs', 'spades'] },
     rank: { type: String, enum: ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] }
   }],
-  sidePots: [{
+  pots: [{
     amount: { type: Number, default: 0 },
-    players: [{ type: Schema.Types.ObjectId, ref: 'User' }]
+    contributors: [{
+      playerId: { type: Schema.Types.ObjectId, ref: 'User' },
+      contribution: { type: Number, default: 0 }
+    }],
+    winners: { type: Map, of: Number } // Maps playerId to their winning amount
   }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
+
 
 
 // Pre-save hook to update updatedAt
@@ -125,6 +131,8 @@ const generateDeck = (): ICard[] => {
 
   return deck;
 };
+
+
 
 // Static method to create a new poker game from a poker desk
 PokerGameSchema.statics.createGameFromTable = async function (pokerDeskId: mongoose.Types.ObjectId): Promise<IPokerGame> {
@@ -180,7 +188,7 @@ PokerGameSchema.statics.createGameFromTable = async function (pokerDeskId: mongo
     pokerDeskId,
     players: activePlayers,
     status: 'in-progress',
-    pot: initialPot,  // Start pot with the SB + BB
+    pot: [],   
     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,  // Set to next player after BB, or fallback to SB if only 2 players
     sidePots: [],
     rounds: [{
@@ -590,8 +598,72 @@ console.log("actionPlayerIds", actionPlayerIds);
 };
 
 
+// PokerGameSchema.methods.showdown = async function () {
+//   // Check if the game is in progress
+//   if (this.status !== 'in-progress') {
+//     throw new Error('Game is not currently in progress.');
+//   }
+
+//   // Gather players who are still eligible (active or all-in)
+//   const eligiblePlayers = this.players.filter(player => 
+//     player.status === 'active' || player.status === 'all-in'
+//   );
+
+//   const pots = createPots(this.rounds); // Generate pots dynamically
+//   console.log(`Created pots`, pots);
+
+//   // Evaluate hands for eligible players
+//   const playerHands = evaluateHands(eligiblePlayers, this.communityCards);
+//   console.log(`playerHands`, playerHands);
+   
+//   // Distribute winnings from each side pot
+//   const PotResults = evaluatePots(eligiblePlayers, this.communityCards, pots);
+//   console.log("Side Pot Results", sidePotResults);
+
+//   for (const sidePot of this.sidePots) {
+//     const { winners, rankings } = sidePotResults[`SidePot ${sidePot.amount}`];
+
+//     // Log rankings for the current side pot
+//     console.log(`Rankings for SidePot ${sidePot.amount}:`, rankings);
+//     console.log(`winners for SidePot ${sidePot.amount}:`, winners);
+
+//     // If there are winning players, determine the actual winner
+//     if (rankings.length > 0) {
+//       // Sort rankings to find the highest-ranked hand
+//       rankings.sort((a, b) => {
+//         if (a.handRank !== b.handRank) {
+//           return b.handRank - a.handRank; // higher handRank is better
+//         }
+//         return b.highCard - a.highCard; // Higher highCard is better
+//       });
+
+//       const topRanking = rankings[0];
+//       const topWinners = rankings.filter(rank => rank.handRank === topRanking.handRank && rank.highCard === topRanking.highCard);
+      
+//       const individualShare = sidePot.amount / topWinners.length;
+//       console.log(`individualShare`, individualShare);
+
+//       // Update each winning player's balance
+//       for (const rank of topWinners) {
+//         const player = this.players.find(p => p.userId.equals(rank.playerId));
+//         if (player) {
+//           player.balanceAtTable += individualShare; // Distribute winnings
+//           console.log(`Updated balance for playerId ${rank.playerId}:`, player.balanceAtTable);
+ 
+//         }
+//       }
+//     }
+//   }
+
+//   // Set the game status to finished
+//   this.status = 'finished';
+
+//   // Save the updated game state to the database
+//   await this.save();
+// };
+ 
 PokerGameSchema.methods.showdown = async function () {
-  // Check if the game is in progress
+  // Ensure the game is in progress
   if (this.status !== 'in-progress') {
     throw new Error('Game is not currently in progress.');
   }
@@ -601,48 +673,36 @@ PokerGameSchema.methods.showdown = async function () {
     player.status === 'active' || player.status === 'all-in'
   );
 
-  // Evaluate hands for eligible players
-  const playerHands = evaluateHands(eligiblePlayers, this.communityCards);
-  console.log(`playerHands`, playerHands);
+  // Dynamically generate pots based on the betting rounds
+  const pots = createPots(this.rounds); // This returns WPot[]
+  console.log('Created pots:', pots);
 
-  // Distribute winnings from each side pot
-  const sidePotResults = evaluateSidePots(eligiblePlayers, this.communityCards, this.sidePots);
-  console.log("Side Pot Results", sidePotResults);
+  // Evaluate hands for eligible players and calculate winners for each pot
+  const evaluatedPots = evaluatePots(eligiblePlayers, this.communityCards, pots); // This returns IPot[]
+  console.log('Evaluated pots:', evaluatedPots);
 
-  for (const sidePot of this.sidePots) {
-    const { winners, rankings } = sidePotResults[`SidePot ${sidePot.amount}`];
+  // Iterate through each pot and distribute the winnings to the players
+  evaluatedPots.forEach(pot => {
+    console.log(`Processing pot of amount: ${pot.amount}, with winners:`, pot.winners);
 
-    // Log rankings for the current side pot
-    console.log(`Rankings for SidePot ${sidePot.amount}:`, rankings);
-    console.log(`winners for SidePot ${sidePot.amount}:`, winners);
+    // Iterate through each winner in the pot and distribute their share
+    Object.keys(pot.winners).forEach(playerId => {
+      const winningAmount = pot.winners[playerId];
+      const player = this.players.find(p => p.userId === playerId);
 
-    // If there are winning players, determine the actual winner
-    if (rankings.length > 0) {
-      // Sort rankings to find the highest-ranked hand
-      rankings.sort((a, b) => {
-        if (a.handRank !== b.handRank) {
-          return b.handRank - a.handRank; // higher handRank is better
-        }
-        return b.highCard - a.highCard; // Higher highCard is better
-      });
-
-      const topRanking = rankings[0];
-      const topWinners = rankings.filter(rank => rank.handRank === topRanking.handRank && rank.highCard === topRanking.highCard);
-      
-      const individualShare = sidePot.amount / topWinners.length;
-      console.log(`individualShare`, individualShare);
-
-      // Update each winning player's balance
-      for (const rank of topWinners) {
-        const player = this.players.find(p => p.userId.equals(rank.playerId));
-        if (player) {
-          player.balanceAtTable += individualShare; // Distribute winnings
-          console.log(`Updated balance for playerId ${rank.playerId}:`, player.balanceAtTable);
- 
-        }
+      if (player) {
+        // Add the winning amount to the player's balance at the table
+        player.balanceAtTable += winningAmount;
+        console.log(`Updated balance for player ${playerId}:`, player.balanceAtTable);
       }
-    }
-  }
+    });
+  });
+
+  // Log the final state of players' balances after winnings are distributed
+  console.log('Final player balances:', this.players.map(p => ({
+    playerId: p.userId,
+    balance: p.balanceAtTable
+  })));
 
   // Set the game status to finished
   this.status = 'finished';
@@ -650,7 +710,6 @@ PokerGameSchema.methods.showdown = async function () {
   // Save the updated game state to the database
   await this.save();
 };
- 
 
 const PokerGame = mongoose.model<IPokerGame>('PokerGame', PokerGameSchema);
 

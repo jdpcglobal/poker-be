@@ -9,6 +9,19 @@ export interface ISeat {
   isSittingOut: boolean;
 }
 
+
+export interface IPot {
+  amount: number; // The total amount in the pot
+  contributors: {
+    playerId: string; // The ID of the player contributing to the pot
+    contribution: number; // The amount contributed by the player
+  }[];
+  winners: { 
+    [playerId: string]: number; // The player ID and the amount they won from this pot
+  };
+}
+
+
 // Define types for player status and actions
 export type PlayerStatus = 'active' | 'all-in' | 'folded' | 'sitting-out';
 export type PlayerAction = 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'small-blind' | 'big-blind';
@@ -58,7 +71,7 @@ export interface IPokerGame {
   status: 'waiting' | 'in-progress' | 'finished';
   rounds: IRound[];
   communityCards: ICard[];
-  sidePots: ISidePot[];
+  pots: IPot[] | null; // Updated field
   createdAt: Date;
   updatedAt: Date;
 
@@ -70,8 +83,9 @@ export interface IPokerGame {
   startNextRound(roundName?: 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown'): Promise<void>;
   handlePlayerAction(userId: mongoose.Types.ObjectId, action: PlayerAction, amount?: number): Promise<void>;
   showdown(): Promise<void>;
-  createSidePots(): void;
+  createPots(): void; // You may want to implement or rename this to reflect the new logic
 }
+
 
 // PokerDesk interface
 export interface IPokerTable extends mongoose.Document {

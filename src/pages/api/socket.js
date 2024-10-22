@@ -230,6 +230,7 @@ const sendNecessaryData = async (io, tableId) => {
         status: pokerGame.status,
         currentTurnPlayer: pokerGame.currentTurnPlayer,
         currentRound: pokerGame.rounds[pokerGame.rounds.length - 1],
+        rounds : pokerGame.rounds
       };
     }
 

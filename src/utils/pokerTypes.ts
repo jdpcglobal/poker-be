@@ -2,6 +2,29 @@ export interface ICard {
     suit: 'hearts' | 'diamonds' | 'clubs' | 'spades';
     rank: '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
   }
+ 
+  interface IPot {
+    amount: number; // The total amount in the pot
+    contributors: {
+      playerId: string; // The ID of the player contributing to the pot
+      contribution: number; // The amount contributed by the player
+    }[];
+    winners: { 
+      [playerId: string]: number; // The player ID and the amount they won from this pot
+    }[];
+  }
+  
+
+  export interface WPot {
+    amount: number; // The total amount in the pot
+    contributors: {
+      playerId: string; // The ID of the player contributing to the pot
+      contribution: number; // The amount contributed by the player
+    }[];
+    // Array of player IDs who are the winners for this pot
+  }
+
+  
   
   export interface IPlayer {
     userId: string; // Assuming string type for player ID, adjust as needed
