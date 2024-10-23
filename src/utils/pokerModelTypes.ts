@@ -9,7 +9,7 @@ export interface ISeat {
   isSittingOut: boolean;
 }
 
-
+ 
 export interface IPot {
   amount: number; // The total amount in the pot
   contributors: {
@@ -17,9 +17,10 @@ export interface IPot {
     contribution: number; // The amount contributed by the player
   }[];
   winners: { 
-    [playerId: string]: number; // The player ID and the amount they won from this pot
-  };
-}
+    playerId: string; // The ID of the winning player
+    amount: number;   // The amount the player won from this pot
+  }[];
+}  
 
 
 // Define types for player status and actions

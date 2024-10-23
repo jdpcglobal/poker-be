@@ -38,10 +38,12 @@ const PotSchema = new Schema({
             contribution: { type: Number, required: true, default: 0 }, // The amount contributed by the player
         },
     ],
-    winners: {
-        type: Map, // Use Map to represent winners dynamically
-        of: Number, // Each winner's ID maps to the amount they won from this pot
-    },
+    winners: [
+        {
+            playerId: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // The ID of the player contributing to the pot
+            amount: { type: Number, required: true, default: 0 }, // The amount contributed by the player
+        },
+    ],
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });

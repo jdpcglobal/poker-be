@@ -58,10 +58,10 @@ const PotSchema = new Schema({
       contribution: { type: Number, required: true, default: 0 }, // The amount contributed by the player
     },
   ],
-  winners: {
-    type: Map, // Use Map to represent winners dynamically
-    of: Number, // Each winner's ID maps to the amount they won from this pot
-  },
+  winners: [ {
+    playerId: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // The ID of the player contributing to the pot
+    amount: { type: Number, required: true, default: 0 },// Each winner's ID maps to the amount they won from this pot
+  }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -1186,26 +1186,30 @@ PokerDeskSchema.methods.showdown = async function () {
   this.currentGame.pots = potResults;
 
   // Process each pot to distribute winnings
-  for (const pot of potResults) {
-    const winners = pot.winners;
+ // Process each pot to distribute winnings
+for (const pot of potResults) {
+  const winners = pot.winners;
 
-    // Log winners for the current pot
-    console.log(`Winners for Pot ${pot.amount}:`, winners);
+  // Log winners for the current pot
+  console.log(`Winners for Pot ${pot.amount}:`, winners);
 
-    // If there are winning players, distribute the winnings
-    if (Object.keys(winners).length > 0) {
-      // Update each winning player's balance using the winning amounts from evaluatePots
-      for (const playerId of Object.keys(winners)) {
-        const playerSeat = this.seats.find(seat => seat.userId.equals(playerId));
-        if (playerSeat) {
-          // Use the winning amount from the winners map instead of calculating a new share
-          const winningAmount = winners[playerId];
-          playerSeat.balanceAtTable += winningAmount; // Distribute winnings
-          console.log(`Updated balance for playerId ${playerId}:`, playerSeat.balanceAtTable);
-        }
+  // If there are winning players, distribute the winnings
+  if (winners.length > 0) {
+    // Update each winning player's balance using the winning amounts from evaluatePots
+    for (const winner of winners) {
+      const { playerId, amount } = winner; // Extract playerId and winning amount
+      console.log("playerId",playerId)
+      const playerSeat = this.seats.find(seat => seat.userId.toString() === playerId.toString());
+      console.log(playerSeat);
+      if (playerSeat) {
+        // Use the winning amount directly from the winners array
+        playerSeat.balanceAtTable += amount; // Distribute winnings
+        console.log(`Updated balance for playerId ${playerId}:`, playerSeat.balanceAtTable);
       }
     }
   }
+}
+
 
   const archivedGame = new PokerGameArchive({
     deskId: this._id, // Assuming this is the desk's ID
