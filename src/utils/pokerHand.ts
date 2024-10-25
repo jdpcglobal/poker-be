@@ -159,10 +159,7 @@ export const evaluatePots = (players: IPlayer[], communityCards: ICard[], pots: 
         return contributor.playerId === hand.playerId.toString() && hand.hand !== 'folded';
       });
     });
-    
- 
-    
-
+     
     console.log("eligibleHands", eligibleHands);
 
     // If no eligible hands, return pot without winners

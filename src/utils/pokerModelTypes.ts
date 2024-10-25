@@ -75,7 +75,9 @@ export interface IPokerGame {
   pots: IPot[] | null; // Updated field
   createdAt: Date;
   updatedAt: Date;
-
+  minBuyIn : Number;
+  maxBuyIn : Number;
+  
   // PokerGame methods transferred to PokerDesk
   createGameFromTable(pokerDeskId: mongoose.Types.ObjectId): Promise<void>;
   dealCards(count: number, cardType?: 'hole' | 'community'): ICard[];
@@ -100,7 +102,12 @@ export interface IPokerTable extends mongoose.Document {
   totalBuyIns: number;
   createdAt: Date;
   updatedAt: Date;
-
+  stake: number; // Single field for either smallBlind, bigBlind, or anteAmount
+  minBuyIn: number;
+  maxBuyIn: number;
+  maxPlayerCount: number;
+  blindsOrAntes: 'blinds' | 'antes'; // To differentiate
+  status: 'active' | 'disable'; 
   // PokerDesk methods
   addUserToSeat(userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat>;
   userLeavesSeat(userId: mongoose.Types.ObjectId): Promise<number>;

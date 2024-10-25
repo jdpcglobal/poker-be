@@ -2,7 +2,6 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import PokerDesk from "../../models/pokerDesk";
 import User from "../../models/user"; // Adjust path if needed
-import PokerGame from "../../models/pokerGame";
 const socketRegistry = {};
 
 // Add a socket to the registry
@@ -28,149 +27,7 @@ const removeSocket = (socketId) => {
   }
   console.log(`Socket ${socketId} removed from registry`);
 };
-
-// Update table data and broadcast to room
-// const updateTableForRoom = async (io, tableId) => {
-//     try {
-//       const pokerTable = await PokerDesk.findById(tableId)
-//         .populate('observers', 'username')
-//         .populate('seats.userId', 'username'); // Only populate userId and username
-
-//       if (!pokerTable) throw new Error('Poker table not found');
-
-//       // Convert seats to include only userId and username (if the seat is occupied)
-//       const formattedSeats = pokerTable.seats.map(seat => {
-//         if (seat.userId) {
-//           return {
-//             userId: seat.userId._id,
-//             username: seat.userId.username,
-//             buyInAmount: seat.buyInAmount,
-//           };
-//         } else {
-//           return null; // If the seat is not occupied
-//         }
-//       }).filter(seat => seat !== null); // Filter out any unoccupied seats
-
-//       // Emit the table data to the room
-//       io.to(`table-${tableId}`).emit('tableData', {
-//         tableId: pokerTable._id,
-//         tableName: pokerTable.tableName,
-//         maxSeats: pokerTable.maxSeats,
-//         currentGameStatus: pokerTable.currentGameStatus,
-//         seats: formattedSeats,
-//       });
-
-//       console.log(`Table ${tableId} data sent to room`);
-//     } catch (error) {
-//       console.error(`Error updating table: ${error.message}`);
-//     }
-//   };
-
-//   const updateGameForRoom = async (io, gameId) => {
-//     try {
-//       const pokerGame = await PokerGame.findById(gameId)
-//         .populate('players.userId', 'username');
-
-//       if (!pokerGame) throw new Error('Poker game not found');
-
-//       io.to(`table-${pokerGame.pokerDeskId}`).emit('gameData', {
-//         gameId: pokerGame._id,
-//         players: pokerGame.players.map(player => ({
-//           userId: player.userId._id,
-//           username: player.userId.username,
-//           balanceAtTable: player.balanceAtTable,
-//           totalBet: player.totalBet,
-//           holeCards: player.holeCards,
-//           role: player.role,
-//         })),
-//         communityCards: pokerGame.communityCards,
-//         pot: pokerGame.pot,
-//         sidePots: pokerGame.sidePots,
-//         status: pokerGame.status,
-//         currentTurnPlayer: pokerGame.currentTurnPlayer,
-//         currentRound: pokerGame.rounds[pokerGame.rounds.length - 1]
-//       });
-
-//       console.log(`Game ${gameId} data sent to room`);
-//     } catch (error) {
-//       console.error(`Error updating game: ${error.message}`);
-//     }
-//   };
-
-// Utility to update table data and broadcast to room
-const updateTableForRoom = async (io, tableId) => {
-  try {
-    const pokerTable = await PokerDesk.findById(tableId)
-      .populate("observers", "username")
-      .populate("seats.userId", "username"); // Only populate userId and username
-
-    if (!pokerTable) throw new Error("Poker table not found");
-
-    // Convert seats to include only userId and username (if the seat is occupied)
-    const formattedSeats = pokerTable.seats
-      .map((seat) => {
-        if (seat.userId) {
-          return {
-            userId: seat.userId._id,
-            username: seat.userId.username,
-            buyInAmount: seat.buyInAmount,
-          };
-        } else {
-          return null; // If the seat is not occupied
-        }
-      })
-      .filter((seat) => seat !== null); // Filter out any unoccupied seats
-
-    // Emit the table data to the room
-    io.to(`table-${tableId}`).emit("tableData", {
-      tableId: pokerTable._id,
-      tableName: pokerTable.tableName,
-      maxSeats: pokerTable.maxSeats,
-      currentGameStatus: pokerTable.currentGameStatus,
-      seats: formattedSeats,
-    });
-
-    console.log(`Table ${tableId} data sent to room`);
-  } catch (error) {
-    console.error(`Error updating table: ${error.message}`);
-  }
-};
-// Utility to update game data and broadcast to room
-// const updateGameForRoom = async (io, tableId) => {
-//   try {
-//     const pokerTable = await PokerDesk.findById(tableId).populate(
-//       "currentGame.players.userId",
-//       "username"
-//     ); // Populate player usernames
-
-//     const pokerGame = pokerTable.currentGame;
-//     if (!pokerGame) throw new Error("Poker game not found");
-
-//     // Emit game data to the room
-//     io.to(`table-${tableId}`).emit("gameData", {
-//       gameId: pokerGame._id,
-//       players: pokerGame.players.map((player) => ({
-//         userId: player.userId._id,
-//         username: player.userId.username,
-//         balanceAtTable: player.balanceAtTable,
-//         totalBet: player.totalBet,
-//         holeCards: player.holeCards,
-//         role: player.role,
-//       })),
-//       communityCards: pokerGame.communityCards,
-//       pot: pokerGame.pot,
-//       sidePots: pokerGame.sidePots,
-//       status: pokerGame.status,
-//       currentTurnPlayer: pokerGame.currentTurnPlayer,
-//       currentRound: pokerGame.rounds[pokerGame.rounds.length - 1],
-//     });
-
-//     console.log(`Game data for table ${tableId} sent to room`);
-//   } catch (error) {
-//     console.error(`Error updating game: ${error.message}`);
-//   }
-// };
-
+ 
 const sendNecessaryData = async (io, tableId) => {
   try {
     const pokerTable = await PokerDesk.findById(tableId)
@@ -226,7 +83,7 @@ const sendNecessaryData = async (io, tableId) => {
         gameId: pokerGame._id,
         communityCards: pokerGame.communityCards,
         pot: pokerGame.pot,
-        sidePots: pokerGame.sidePots,
+        pots: pokerGame.pots,
         status: pokerGame.status,
         currentTurnPlayer: pokerGame.currentTurnPlayer,
         currentRound: pokerGame.rounds[pokerGame.rounds.length - 1],
@@ -250,84 +107,90 @@ const sendNecessaryData = async (io, tableId) => {
   }
 };
 
-
-const updateGameForRoom = async (io, tableId) => {
+// Function to send table-specific data (seats, observers)
+const sendTableData = async (io, tableId) => {
   try {
     const pokerTable = await PokerDesk.findById(tableId)
-      .populate("currentGame.players.userId", "username"); // Populate player usernames
+      .populate("seats.userId", "username") // Only populate username for seats
+      .populate("observers", "username");   // Populate observers as well
 
-    const pokerGame = pokerTable.currentGame;
-    if (!pokerGame) throw new Error("Poker game not found");
+    if (!pokerTable) throw new Error("Poker table not found");
 
-    // Create a mapping of userId to balanceAtTable from the seats
-    const seatsBalanceMap = {};
-    pokerTable.seats.forEach(seat => {
-      if (seat.userId) {
-        seatsBalanceMap[seat.userId.toString()] = seat.balanceAtTable;
-      }
+    // Convert seats to include userId, username, buy-in amount, and balance
+    const formattedSeats = pokerTable.seats
+      .map((seat) => {
+        if (seat.userId) {
+          return {
+            userId: seat.userId._id,
+            username: seat.userId.username,
+            buyInAmount: seat.buyInAmount,
+            balanceAtTable: seat.balanceAtTable,
+          };
+        } else {
+          return null; // If the seat is not occupied
+        }
+      })
+      .filter((seat) => seat !== null); // Filter out any unoccupied seats
+
+    // Emit only the table data to the room
+    io.to(`table-${tableId}`).emit("tableData", {
+      tableId: pokerTable._id,
+      tableName: pokerTable.tableName,
+      maxSeats: pokerTable.maxSeats,
+      currentGameStatus: pokerTable.currentGameStatus,
+      seats: formattedSeats, // Only table-specific seat information
     });
 
-    // Emit game data to the room
-    io.to(`table-${tableId}`).emit("gameData", {
+    console.log(`Table data for table ${tableId} sent to room`);
+  } catch (error) {
+    console.error(`Error sending table data: ${error.message}`);
+  }
+};
+
+// Function to send game-specific data (pot, community cards, etc.)
+const sendGameData = async (io, tableId) => {
+  try {
+    const pokerTable = await PokerDesk.findById(tableId);
+    if (!pokerTable) throw new Error("Poker table not found");
+
+    const pokerGame = pokerTable.currentGame;
+    if (!pokerGame) {
+      console.log("No active game for this table");
+      return;
+    }
+
+    // Prepare game data if a game is active
+    const currentGameData = {
       gameId: pokerGame._id,
-      players: pokerGame.players.map((player) => ({
-        userId: player.userId._id,
-        username: player.userId.username,
-        balanceAtTable: seatsBalanceMap[player.userId._id.toString()] || 0, // Get balance from seats
-        totalBet: player.totalBet,
-        holeCards: player.holeCards,
-        role: player.role,
-      })),
       communityCards: pokerGame.communityCards,
       pot: pokerGame.pot,
-      sidePots: pokerGame.sidePots,
+      pots: pokerGame.pots,
       status: pokerGame.status,
       currentTurnPlayer: pokerGame.currentTurnPlayer,
       currentRound: pokerGame.rounds[pokerGame.rounds.length - 1],
+      rounds: pokerGame.rounds
+    };
+
+    // Emit only the game data to the room
+    io.to(`table-${tableId}`).emit("gameData", {
+      currentGame: currentGameData, // Game-specific data only
     });
 
     console.log(`Game data for table ${tableId} sent to room`);
   } catch (error) {
-    console.error(`Error updating game: ${error.message}`);
+    console.error(`Error sending game data: ${error.message}`);
   }
 };
 
 
-const checkAndUpdateGameForRoom = async (io, tableId) => {
+const sendPlayerActionResult = async (io, tableId, actionResult) => {
   try {
-    // Find an active game for the given tableId
-    const activeGame = await PokerGame.findOne({
-      pokerDeskId: tableId,
-      status: "in-progress",
+    io.to(`table-${tableId}`).emit("playerActionResult", {
+      actionResult,  // Emit the action result directly
     });
-
-    if (activeGame) {
-      // Emit game data to the room
-      io.to(`table-${tableId}`).emit("gameData", {
-        gameId: activeGame._id,
-        players: activeGame.players.map((player) => ({
-          userId: player.userId._id,
-          username: player.userId.username,
-          balanceAtTable: player.balanceAtTable,
-          totalBet: player.totalBet,
-          holeCards: player.holeCards,
-          role: player.role,
-        })),
-        communityCards: activeGame.communityCards,
-        pot: activeGame.pot,
-        minimumBet: activeGame.minimumBet,
-        status: activeGame.status,
-        rounds: activeGame.rounds,
-      });
-
-      console.log(`Game ${activeGame._id} data sent to table room ${tableId}`);
-    } else {
-      console.log(`No active game found for table ${tableId}`);
-    }
+    console.log(`Player action result sent for table ${tableId}`);
   } catch (error) {
-    console.error(
-      `Error checking and updating game for table ${tableId}: ${error.message}`
-    );
+    console.error(`Error sending player action result: ${error.message}`);
   }
 };
 
@@ -385,38 +248,7 @@ export default function handler(req, res) {
         }
       });
 
-      // socket.on('playerAction', async ({ gameId, action, amount, userId }) => {
-      //   console.log("current user id ",userId);
-      //   try {
-      //     if (!userId || !userId) {
-      //       throw new Error('User not registered or not in a table.');
-      //     }
-
-      //     // Find the current game
-      //     const pokerGame = await PokerGame.findById(gameId);
-      //     if (!pokerGame) throw new Error('Game not found.');
-
-      //     // Check if it's the player's turn
-      //     if (!pokerGame.currentTurnPlayer.equals(userId)) {
-      //       throw new Error("It's not your turn.");
-      //     }
-
-      //     // Handle the player action using PokerGame's methods
-      //     await pokerGame.handlePlayerAction(userId, action, amount);
-
-      //     // Broadcast the updated game state to the room
-      //     await updateGameForRoom(io, gameId);
-      //   } catch (error) {
-      //     console.error(`Error handling player action: ${error.message}`);
-      //     socket.emit('error', { message: error.message });
-      //   }
-      // });
-
-      // Sit at a table
-
-      // Player action (game-related event)
-
-       // Player action (game-related event)
+       
        socket.on('playerAction', async ({ tableId, action, amount, userId }) => {
         try {
           console.log("tableId",tableId);
@@ -562,3 +394,149 @@ export default function handler(req, res) {
 
   res.end();
 }
+
+// export default function handler(req, res) {
+//   if (!res.socket.server.io) {
+//     console.log("Initializing new Socket.io server...");
+//     const io = new Server(res.socket.server, {
+//       path: "/api/socket",
+//       cors: {
+//         origin: ["http://localhost:8081", "http://192.168.1.9:3000"],
+//       },
+//     });
+//     res.socket.server.io = io;
+
+//     io.on("connection", (socket) => {
+//       console.log(`Client connected: ${socket.id}`);
+
+//       let currentUserId = null;
+//       let currentTableId = null;
+
+//       socket.on("register", ({ token }) => {
+//         try {
+//           const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//           currentUserId = decoded.userId;
+//           addSocket(currentUserId, socket.id);
+//         } catch (error) {
+//           socket.emit("error", { message: "Invalid token" });
+//         }
+//       });
+
+//       socket.on("joinTable", async ({ token, tableId }) => {
+//         try {
+//           const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//           currentUserId = decoded.userId;
+//           currentTableId = tableId;
+
+//           socket.join(`table-${tableId}`);
+
+//           // Send both table and game data when player joins
+//           await sendTableData(io, tableId);
+//           await sendGameData(io, tableId);
+//         } catch (error) {
+//           socket.emit("error", { message: "Error joining table" });
+//         }
+//       });
+
+//       socket.on("sitAtTable", async ({ token, tableId, buyInAmount }) => {
+//         try {
+//           const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//           const userId = decoded.userId;
+
+//           const pokerTable = await PokerDesk.findById(tableId);
+//           if (!pokerTable) throw new Error("Poker table not found");
+
+//           const isAlreadySeated = await pokerTable.isUserSeated(userId);
+//           if (isAlreadySeated) {
+//             return socket.emit("error", { message: "User already seated at this table" });
+//           }
+
+//           // Add user to seat and send updated table data
+//           await pokerTable.addUserToSeat(userId, buyInAmount);
+//           await sendTableData(io, tableId);
+//         } catch (error) {
+//           socket.emit("error", { message: "Error sitting at table" });
+//         }
+//       });
+
+//       socket.on("leaveSeat", async ({ token, tableId }) => {
+//         try {
+//           const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//           const userId = decoded.userId;
+
+//           const pokerTable = await PokerDesk.findById(tableId);
+//           if (!pokerTable) throw new Error("Poker table not found");
+
+//           await pokerTable.userLeavesSeat(userId);
+//           await pokerTable.removeObserver(userId);
+
+//           // Send updated table data when a player leaves a seat
+//           await sendTableData(io, tableId);
+//         } catch (error) {
+//           socket.emit("error", { message: "Error leaving seat" });
+//         }
+//       });
+
+//       socket.on("playerAction", async ({ tableId, action, amount, userId }) => {
+//         try {
+//           const pokerTable = await PokerDesk.findById(tableId);
+//           if (!pokerTable) throw new Error("Table not found");
+
+//           const pokerGame = pokerTable.currentGame;
+//           if (!pokerGame) throw new Error("Game not found");
+
+//           if (!pokerGame.currentTurnPlayer.equals(userId)) {
+//             throw new Error("It's not your turn.");
+//           }
+
+//          const result = await pokerTable.handlePlayerAction(userId, action, amount);
+      
+//          if (result.gameStatus === "finished") {
+//           // Send the final game data if the game has ended
+//           await sendGameData(io, tableId); 
+//         }else{
+//           await sendPlayerActionResult(io, tableId, result.action);
+//         }
+//           // Send player action result
+         
+//           // Check if the game status is finished, and if so, send game data with pots
+//           // if (pokerGame.status === "finished") {
+//           //   await sendGameData(io, tableId);  // This will include pots data if game is finished
+//           // }
+//         } catch (error) {
+//           socket.emit("error", { message: error.message });
+//         }
+//       });
+
+//       socket.on("createGame", async ({ token, tableId }) => {
+//         try {
+//           const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//           currentUserId = decoded.userId;
+
+//           const pokerTable = await PokerDesk.findById(tableId);
+//           if (!pokerTable) throw new Error("Poker table not found");
+
+//           await pokerTable.createGameFromTable();
+
+//           // Send only game data when a new game is created
+//           await sendGameData(io, tableId);
+//         } catch (error) {
+//           socket.emit("error", { message: error.message });
+//         }
+//       });
+
+//       socket.on("disconnect", async () => {
+//         removeSocket(socket.id);
+//         if (currentTableId && currentUserId) {
+//           const pokerTable = await PokerDesk.findById(currentTableId);
+//           if (pokerTable) {
+//             await pokerTable.removeObserver(currentUserId);
+//             socket.leave(`table-${currentTableId}`);
+//           }
+//         }
+//       });
+//     });
+//   }
+
+//   res.end();
+// }
