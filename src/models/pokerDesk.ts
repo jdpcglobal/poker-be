@@ -13,7 +13,8 @@ import {
   IRound,
   IPlayerActionRecord,
   IPlayerBets,
-  RPokerGame
+  RPokerGame,
+  IWalletTransaction
 } from '../utils/pokerModelTypes'; // Adjust the path based on your folder structure
 import {evaluateHands, evaluatePots} from '../utils/pokerHand';
 import createPots from '@/utils/createPots';
@@ -136,13 +137,63 @@ PokerDeskSchema.pre<IPokerTable>('save', function (next) {
 });
 
 // Method to handle adding a user to a seat
-PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat> {
+// PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat> {
   
-  if(userId && buyInAmount){
+//   if(userId && buyInAmount){
+//   if (this.seats.length >= this.maxSeats) {
+//     throw new Error('No available seats.');
+//   }
+
+//   const seatNumber = this.seats.length + 1;
+
+//   const newSeat: ISeat = {
+//     seatNumber,
+//     userId,
+//     buyInAmount,
+//     balanceAtTable: buyInAmount,
+//     isSittingOut: false,
+//   };
+
+//   this.seats.push(newSeat);
+//   this.totalBuyIns += buyInAmount;
+
+//   try {
+//     await this.save();
+//     return newSeat;
+//   } catch (error: any) {
+//     throw new Error('Error saving the updated table: ' + error.message);
+//   } 
+// }else{
+//   throw new Error('Error saving the updated table: userid is required');
+// }
+// };
+
+PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat> {
+  // Validate input parameters
+  if (!userId || !buyInAmount) {
+    throw new Error('User ID and buy-in amount are required.');
+  }
+
+  // Check for available seats
   if (this.seats.length >= this.maxSeats) {
     throw new Error('No available seats.');
   }
 
+  // Fetch user information
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found.');
+  }
+
+  // Check if user has sufficient balance
+  if (user.wallet.balance < buyInAmount) {
+    throw new Error('Insufficient balance to join the table.');
+  }
+
+  // Update user's balance
+  user.wallet.balance -= buyInAmount;
+
+  // Create the new seat
   const seatNumber = this.seats.length + 1;
 
   const newSeat: ISeat = {
@@ -153,21 +204,57 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     isSittingOut: false,
   };
 
+  // Add the new seat to the table
   this.seats.push(newSeat);
   this.totalBuyIns += buyInAmount;
 
+  // Create a wallet transaction for the buy-in
+  const transaction: IWalletTransaction = {
+    createdOn: new Date(),
+    completedOn: new Date(), // Will be set when the transaction is completed
+    status: 'successful', // Assuming it's successful when deducted
+    amount: buyInAmount,
+    type: 'deskIn', // Type of transaction indicating user sitting in
+    remark: `User joined the table with seat number ${seatNumber}`,
+    DeskId: this._id, // Reference to this PokerDesk 
+  };
+
+  // Add the transaction to the user's wallet
+  user.wallet.transactions.push(transaction);
+
+  // Save the updated user and PokerDesk instances
   try {
-    await this.save();
-    return newSeat;
+    await user.save(); // Save user with updated balance and transaction
+    await this.save(); // Save PokerDesk with the new seat
+    return newSeat; // Return the newly created seat
   } catch (error: any) {
-    throw new Error('Error saving the updated table: ' + error.message);
-  } 
-}else{
-  throw new Error('Error saving the updated table: userid is required');
-}
+    throw new Error('Error saving the updated table or user: ' + error.message);
+  }
 };
 
 // Method for handling a user leaving a seat
+// PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
+//   // Find the seat occupied by the user
+//   const seatToRemove = this.seats.find((seat: ISeat) => seat.userId && seat.userId.equals(userId));
+
+//   if (!seatToRemove) {
+//     throw new Error('User is not seated at this table.');
+//   }
+
+//   // Update the user's balance directly
+//   await User.findByIdAndUpdate(userId, { $inc: { balance: seatToRemove.balanceAtTable } });
+
+//   // Filter out the seat from the array
+//   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
+
+//   try {
+//     await this.save();
+//     return seatToRemove.seatNumber;
+//   } catch (error: any) {
+//     throw new Error('Error saving the updated table: ' + error.message);
+//   }
+// };
+
 PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
   // Find the seat occupied by the user
   const seatToRemove = this.seats.find((seat: ISeat) => seat.userId && seat.userId.equals(userId));
@@ -176,17 +263,40 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
     throw new Error('User is not seated at this table.');
   }
 
-  // Update the user's balance directly
-  await User.findByIdAndUpdate(userId, { $inc: { balance: seatToRemove.balanceAtTable } });
+  // Fetch the user from the database
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found.');
+  }
+
+  // Update the user's balance and create a wallet transaction
+  const amountToAdd = seatToRemove.balanceAtTable;
+
+  // Create a wallet transaction for the balance being returned to the user
+  const transaction: IWalletTransaction = {
+    createdOn: new Date(),
+    completedOn: new Date(), // Will be set when the transaction is completed
+    status: 'successful', // Assuming the return is successful
+    amount: amountToAdd,
+    type: 'deskWithdraw', // Type of transaction indicating user leaving the table
+    remark: `User left the table and withdrew ${amountToAdd}`,
+    DeskId: this._id, // Reference to this PokerDesk
+  };
+
+  // Update the user's wallet balance
+  user.wallet.balance += amountToAdd;
+  user.wallet.transactions.push(transaction);
 
   // Filter out the seat from the array
   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
 
   try {
-    await this.save();
-    return seatToRemove.seatNumber;
+    // Save the updated user and PokerDesk instances
+    await user.save(); // Save user with updated balance and transaction
+    await this.save(); // Save PokerDesk with the updated seats
+    return seatToRemove.seatNumber; // Return the seat number that was removed
   } catch (error: any) {
-    throw new Error('Error saving the updated table: ' + error.message);
+    throw new Error('Error saving the updated table or user: ' + error.message);
   }
 };
 

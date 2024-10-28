@@ -131,3 +131,44 @@ export interface IPokerTable extends mongoose.Document {
 
   
 }
+
+export interface IBankAccount {
+  accountNumber: string;
+  bankName: string;
+  ifscCode: string;
+  accountHolderName: string;
+}
+
+export interface IWalletTransaction {
+  createdOn: Date;
+  completedOn?: Date;
+  status: 'failed' | 'completed' | 'successful';
+  amount: number;
+  type: 'deposit' | 'withdraw' | 'deskIn' | 'deskWithdraw' | 'bonus';
+  remark?: string;
+  DeskId?: mongoose.Types.ObjectId;
+  BankTransactionId?: mongoose.Types.ObjectId;
+}
+
+export interface IWallet {
+  balance: number;
+  bonus: number;
+  coins: number;
+  transactions: IWalletTransaction[];
+}
+
+export interface IUser extends Document {
+  mobileNumber: string;
+  username: string;
+  balance: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  totalWinnings: number;
+  registrationDate: Date;
+  lastLogin: Date;
+  isActive: boolean;
+  status: string;
+  wallet: IWallet;
+  bankAccounts: IBankAccount[];
+  updateLastLogin(): Promise<void>;
+}
