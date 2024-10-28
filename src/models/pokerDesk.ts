@@ -10,10 +10,14 @@ import {
   IPokerGame,
   ISidePot,
   IPlayer,
-  IRound
+  IRound,
+  IPlayerActionRecord,
+  IPlayerBets,
+  RPokerGame
 } from '../utils/pokerModelTypes'; // Adjust the path based on your folder structure
 import {evaluateHands, evaluatePots} from '../utils/pokerHand';
 import createPots from '@/utils/createPots';
+ 
 // Define your Seat schema
 const SeatSchema = new Schema<ISeat>({
   seatNumber: { type: Number, required: true },
@@ -224,7 +228,7 @@ const generateDeck = (): ICard[] => {
   return deck;
 };
 
-PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerGame> {
+PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerGame> {
   // Check if a current game already exists and if it's finished
   if (this.currentGame && this.currentGame.status !== 'finished') {
     throw new Error('There is already an active game.');
@@ -232,8 +236,8 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerG
 
   // Filter and set up active players from seats, ensuring they meet the min buy-in
   const activePlayers = this.seats
-    .filter(seat => seat.userId && !seat.isSittingOut && seat.balanceAtTable >= this.minBuyIn)
-    .map(seat => ({
+    .filter((seat: ISeat) => seat.userId && !seat.isSittingOut && seat.balanceAtTable >= this.minBuyIn)
+    .map((seat:ISeat) => ({
       userId: seat.userId!,
       balanceAtTable: seat.balanceAtTable,
       status: 'active',
@@ -263,12 +267,12 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerG
   const deck: ICard[] = generateDeck();
 
   // Deal hole cards to each player
-  activePlayers.forEach(player => {
+  activePlayers.forEach((player : IPlayer) => {
     player.holeCards = [deck.pop()!, deck.pop()!];
   });
 
   // Create a new game object
-  const newGame = {
+  const newGame : RPokerGame  = {
     players: activePlayers,
     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,
     pot: initialPotAmount,
@@ -292,8 +296,8 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<IPokerG
   this.currentGameStatus = 'in-progress';
 
   // Deduct balances in seats and remove players below the minimum buy-in
-  this.seats.forEach((seat, index) => {
-    const matchingPlayer = activePlayers.find(player => player.userId.equals(seat.userId));
+  this.seats.forEach((seat: ISeat, index: number) => {
+    const matchingPlayer = activePlayers.find((player:IPlayer) => player.userId.equals(seat.userId));
     if (matchingPlayer) {
       seat.balanceAtTable = matchingPlayer.balanceAtTable;
     } else if (seat.balanceAtTable < this.minBuyIn) {
@@ -313,9 +317,9 @@ PokerGameSchema.methods.dealCards = function (
   // Get all cards already dealt (hole cards and community cards)
   const usedCards = new Set<string>(
     this.players
-      .flatMap(player => player.holeCards) // Collect hole cards of all players
+      .flatMap((player : IPlayer) => player.holeCards) // Collect hole cards of all players
       .concat(this.communityCards) // Combine with community cards
-      .map(card => `${card.rank}${card.suit}`) // Convert to a string representation for easy comparison
+      .map((card :ICard)=> `${card.rank}${card.suit}`) // Convert to a string representation for easy comparison
   );
 
   // Generate a full shuffled deck and filter out already dealt cards
@@ -341,7 +345,7 @@ PokerGameSchema.methods.dealCards = function (
 
 PokerGameSchema.methods.getNextActivePlayer = function (currentUserId: mongoose.Types.ObjectId): mongoose.Types.ObjectId | null {
   // Get the index of the current player
-  const currentIndex = this.players.findIndex(player => player.userId.equals(currentUserId));
+  const currentIndex = this.players.findIndex((player:IPlayer) => player.userId.equals(currentUserId));
   if (currentIndex === -1) {
     return null; // Current user not found in the players array
   }
@@ -397,7 +401,7 @@ PokerGameSchema.methods.startNextRound = async function (prevRoundName?: 'pre-fl
   }
 
   // Check if the round has already started
-  if (this.rounds.some(round => round.name === roundName)) {
+  if (this.rounds.some((round:IRound) => round.name === roundName)) {
     throw new Error(`Round "${roundName}" already started.`);
   }
 
@@ -594,8 +598,8 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     throw new Error("It's not this player's turn");
   }
 
-  const player = this.seats.find(seat => seat.userId.equals(userId));
-  const playerSeat = this.currentGame.players.find(p => p.userId.equals(userId));
+  const player = this.seats.find((seat:ISeat) => seat.userId.equals(userId));
+  const playerSeat = this.currentGame.players.find((p : IPlayer) => p.userId.equals(userId));
   if (!player) throw new Error('Player not found.');
 
   const currentRound = this.currentGame.rounds[this.currentGame.rounds.length - 1];
@@ -606,15 +610,15 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   // Reduce actions to get player total bets and max bet
   let playerTotalBet = 0;
   let maxBet = 0;
-  const playerBets = currentRound?.actions?.reduce((acc, action) => {
+  const playerBets : IPlayerBets  = currentRound?.actions?.reduce((acc:any, action:any) => {
     acc[action.userId] = (acc[action.userId] || 0) + action.amount;
     maxBet = Math.max(maxBet, acc[action.userId]);
     return acc;
   }, {}) || {};
-  playerTotalBet = playerBets[userId] || 0;
+  playerTotalBet = playerBets[userId.toString()] || 0;
 
-  const callAmount = Math.max(0, maxBet - playerTotalBet); // To avoid negative values
-  let newAction: PlayerAction = { userId, timestamp: new Date(), action: 'fold', amount: 0 };
+  const callAmount : number = Math.max(0, maxBet - playerTotalBet); // To avoid negative values
+  let newAction: IPlayerActionRecord = { userId, timestamp: new Date(), action: 'fold', amount: 0 };
 
   // Handle actions
   if (action === 'fold') {
@@ -676,22 +680,27 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   currentRound.actions.push(newAction);
 
   // Check remaining active players
-  const activePlayers = this.currentGame.players.filter(p => p.status === 'active' ||  p.status === 'all-in' );
+  const activePlayers = this.currentGame.players.filter((p : IPlayer) => p.status === 'active' ||  p.status === 'all-in' );
  
   if (activePlayers.length <= 1) {
     await this.showdown();
   } else {
-    const actionPlayerIds = new Set(currentRound.actions.map(a => a.userId.toString()));
+    const actionPlayerIds = new Set(currentRound.actions.map((a:IPlayerActionRecord) => a.userId.toString()));
     const nextPlayerId = await this.currentGame.getNextActivePlayer(userId);
     const nextPlayerHasActed = actionPlayerIds.has(nextPlayerId.toString());
-    const activeCount = activePlayers.filter(p => p.status === 'active').length;
+    const activeCount = activePlayers.filter((p:IPlayer) => p.status === 'active').length;
     if (!nextPlayerHasActed) {
       this.currentGame.currentTurnPlayer = nextPlayerId;
     } else {
-      const totalBets = currentRound.actions.reduce((acc, action) => {
+      interface ITotalBets {
+        [userId: string]: number; // Allow string keys for user IDs
+    }
+    
+    const totalBets = currentRound.actions.reduce((acc: ITotalBets, action: IPlayerActionRecord) => {
         acc[action.userId.toString()] = (acc[action.userId.toString()] || 0) + action.amount;
         return acc;
-      }, {});
+    }, {} as ITotalBets); // Type assertion for the initial value
+    
       const uniqueBets = new Set(Object.values(totalBets));
       console.log("we are here there active count is ", activeCount);
       console.log("f1",uniqueBets.size === 1 && activeCount <= 1);
@@ -726,7 +735,7 @@ PokerDeskSchema.methods.showdown = async function () {
   }
 
   // Gather players who are still eligible (active or all-in)
-  const eligiblePlayers = this.currentGame.players.filter(player => 
+  const eligiblePlayers = this.currentGame.players.filter((player : IPlayer) => 
     player.status === 'active' || player.status === 'all-in'
   );
 
@@ -761,7 +770,7 @@ for (const pot of potResults) {
     for (const winner of winners) {
       const { playerId, amount } = winner; // Extract playerId and winning amount
       console.log("playerId",playerId)
-      const playerSeat = this.seats.find(seat => seat.userId.toString() === playerId.toString());
+      const playerSeat = this.seats.find((seat:ISeat) => seat.userId.toString() === playerId.toString());
       console.log(playerSeat);
       if (playerSeat) {
         // Use the winning amount directly from the winners array

@@ -3,10 +3,14 @@ import mongoose from 'mongoose';
 // Seat interface
 export interface ISeat {
   seatNumber: number;
-  userId?: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
   buyInAmount: number;
   balanceAtTable: number;
   isSittingOut: boolean;
+}
+
+export interface IPlayerBets {
+  [userId: string]: number;
 }
 
  
@@ -22,6 +26,17 @@ export interface IPot {
   }[];
 }  
 
+export interface RPokerGame {
+  players: IPlayer[];  // List of active players in the game
+  currentTurnPlayer: string;  // User ID of the player whose turn it is
+  pot: number;  // Total amount in the main pot
+  pots: IPot[] | null;  // Array of pots if there are side pots, else null
+  status: 'in-progress' | 'finished';  // Current status of the game
+  rounds: IRound[];  // Array of betting rounds
+  communityCards: ICard[];  // Shared community cards on the table
+  createdAt: Date;  // Timestamp for when the game was created
+  updatedAt: Date;  // Timestamp for the latest update to the game
+}
 
 // Define types for player status and actions
 export type PlayerStatus = 'active' | 'all-in' | 'folded' | 'sitting-out';
@@ -75,8 +90,8 @@ export interface IPokerGame {
   pots: IPot[] | null; // Updated field
   createdAt: Date;
   updatedAt: Date;
-  minBuyIn : Number;
-  maxBuyIn : Number;
+  // minBuyIn : Number;
+  // maxBuyIn : Number;
   
   // PokerGame methods transferred to PokerDesk
   createGameFromTable(pokerDeskId: mongoose.Types.ObjectId): Promise<void>;
