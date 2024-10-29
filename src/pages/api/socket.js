@@ -277,8 +277,7 @@ export default function handler(req, res) {
         credentials: true, // Allow credentials if needed
       },
     });
-
-
+    
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
