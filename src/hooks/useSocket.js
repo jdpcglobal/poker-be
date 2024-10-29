@@ -11,7 +11,7 @@ const useSocket = (username) => {
     }
 
     // Initialize socket connection
-    const socketIo = io('https://poker-be.netlify.app', {
+    const socketIo = io('', {
       path: '/api/socket',
     });
 
