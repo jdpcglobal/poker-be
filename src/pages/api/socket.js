@@ -262,12 +262,23 @@ const checkReconnection = async (tableId, userId) => {
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log("Initializing new Socket.io server...");
+    // const io = new Server(res.socket.server, {
+    //   path: "/api/socket",
+    //   cors: {
+    //     origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"], // Allowed origins
+    //   },
+    // });
+    
     const io = new Server(res.socket.server, {
       path: "/api/socket",
       cors: {
-        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"], // Allowed origins
+        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"],
+        methods: ["GET", "POST"],
+        credentials: true, // Allow credentials if needed
       },
     });
+
+
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
