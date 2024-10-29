@@ -1,5 +1,7 @@
+'use client'
 import Image from "next/image";
 import useSocket from '../hooks/useSocket';
+
 export default function Home() {
   const socket = useSocket("yatodharm tato jayah");
   return (
