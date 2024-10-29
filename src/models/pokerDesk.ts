@@ -25,7 +25,7 @@ const SeatSchema = new Schema<ISeat>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   buyInAmount: { type: Number, default: 0 },
   balanceAtTable: { type: Number, default: 0 },
-  isSittingOut: { type: Boolean, default: false }
+  status: { type: String, enum: ['active', 'disconnected', 'sittingOut'], default: 'active' },
 }, { _id: false });
 
 // Define your Player schema (embedded in game)
@@ -187,6 +187,7 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
 
   // Check if user has sufficient balance
   if (user.wallet.balance < buyInAmount) {
+    console.log("userWallet Balnce is ",user.wallet.balance)
     throw new Error('Insufficient balance to join the table.');
   }
 
@@ -201,7 +202,7 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     userId,
     buyInAmount,
     balanceAtTable: buyInAmount,
-    isSittingOut: false,
+    status: 'active',
   };
 
   // Add the new seat to the table
@@ -300,6 +301,43 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
   }
 };
 
+PokerDeskSchema.methods.updateSeatStatus = async function (
+  userId: mongoose.Types.ObjectId,
+  status: 'active' | 'disconnected' | 'sittingOut'
+): Promise<void> {
+  try {
+    // Check if there is an ongoing game on this table
+    const isGameActive = this.currentGame && this.currentGame.status === 'playing';
+
+    if (status === 'disconnected') {
+      if (isGameActive) {
+        // If a game is active, just set the user's seat status to disconnected
+        const seat = this.seats.find((seat: ISeat) => seat.userId?.equals(userId));
+        if (seat) {
+          seat.status = 'disconnected';
+          console.log(`User ${userId} status updated to 'disconnected' at table ${this._id}`);
+        }
+      } else {
+        // If no game is active, remove the user from the seat and return their balance
+        await this.userLeavesSeat(userId);
+        console.log(`User ${userId} has left the seat as there is no active game at table ${this._id}`);
+      }
+    } else if (status === 'active' || status === 'sittingOut') {
+      // Set the user's seat status to active
+      const seat = this.seats.find((seat: ISeat) => seat.userId?.equals(userId));
+      if (seat) {
+        seat.status = 'active';
+        console.log(`User ${userId} status updated to 'active' at table ${this._id}`);
+      }
+    } 
+
+    // Save changes to the desk instance
+    await this.save();
+  } catch (error: any) {
+    console.error(`Failed to update seat status for user ${userId} at table ${this._id}: ${error.message}`);
+    throw new Error(`Error updating seat status: ${error.message}`);
+  }
+};
 
 // Method to add a user as an observer
 PokerDeskSchema.methods.addObserver = async function (userId: mongoose.Types.ObjectId): Promise<void> {
@@ -346,7 +384,7 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerG
 
   // Filter and set up active players from seats, ensuring they meet the min buy-in
   const activePlayers = this.seats
-    .filter((seat: ISeat) => seat.userId && !seat.isSittingOut && seat.balanceAtTable >= this.minBuyIn)
+    .filter((seat: ISeat) => seat.userId && seat.status === 'active' && seat.balanceAtTable >= this.minBuyIn)
     .map((seat:ISeat) => ({
       userId: seat.userId!,
       balanceAtTable: seat.balanceAtTable,
@@ -844,6 +882,13 @@ PokerDeskSchema.methods.showdown = async function () {
     throw new Error('Game is not currently in progress.');
   }
 
+  for (const player of this.currentGame.players) {
+    if (player.status === 'disconnected') {
+      console.log(`Player ${player.userId} is disconnected, removing from seat`);
+      await this.userLeavesSeat(player.userId);
+    }
+  }
+  
   // Gather players who are still eligible (active or all-in)
   const eligiblePlayers = this.currentGame.players.filter((player : IPlayer) => 
     player.status === 'active' || player.status === 'all-in'
@@ -906,7 +951,7 @@ for (const pot of potResults) {
 
   // Set the current game status to finished
   this.currentGame.status = 'finished';
-
+   
   // Save the updated desk state to the database
   await this.save();
 };

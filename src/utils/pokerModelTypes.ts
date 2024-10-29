@@ -6,8 +6,9 @@ export interface ISeat {
   userId: mongoose.Types.ObjectId;
   buyInAmount: number;
   balanceAtTable: number;
-  isSittingOut: boolean;
+  status: 'active' | 'disconnected' | 'sittingOut'; // Updated status enum
 }
+
 
 export interface IPlayerBets {
   [userId: string]: number;
@@ -128,8 +129,8 @@ export interface IPokerTable extends mongoose.Document {
   userLeavesSeat(userId: mongoose.Types.ObjectId): Promise<number>;
   addObserver(userId: mongoose.Types.ObjectId): Promise<void>;
   removeObserver(userId: mongoose.Types.ObjectId): Promise<void>;
-
-  
+  updateSeatStatus(userId: mongoose.Types.ObjectId, status: 'active' | 'disconnected' | 'sittingOut'): Promise<void>;
+  isUserSeated(userId: mongoose.Types.ObjectId): boolean;
 }
 
 export interface IBankAccount {

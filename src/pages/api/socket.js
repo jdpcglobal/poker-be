@@ -5,29 +5,84 @@ import User from "../../models/user"; // Adjust path if needed
 const socketRegistry = {};
 
 // Add a socket to the registry
-const addSocket = (userId, socketId) => {
-  if (!userId) throw new Error("User ID is required to add socket");
-  if (!socketRegistry[userId]) socketRegistry[userId] = [];
-  if (!socketRegistry[userId].includes(socketId)) {
-    socketRegistry[userId].push(socketId);
-    console.log(`Socket ${socketId} added for user ${userId}`);
+const addSocket = async (userId, tableId, socketId) => {
+  if (!userId || !tableId) throw new Error("User ID and Table ID are required to add socket");
+  console.log("socket registry 66666",socketRegistry);
+  if (!socketRegistry[tableId]) socketRegistry[tableId] = {}; // Ensure table entry exists
+  if (!socketRegistry[tableId][userId]) socketRegistry[tableId][userId] = []; // Ensure user entry exists
+  console.log("socket registry 1234",socketRegistry);
+  if (!socketRegistry[tableId][userId].includes(socketId)) {
+    socketRegistry[tableId][userId].push(socketId);
+    console.log(`Socket ${socketId} added for user ${userId} at table ${tableId}`);
+    await checkReconnection(tableId,userId);
+    console.log("socket registry 23456",socketRegistry);
+  }
+  console.log("socket registry",socketRegistry);
+};
+
+// updateSeatStatus function
+const updateSeatStatus = async (userId, tableId, status) => {
+  try {
+    // Find the desk by tableId
+    const desk = await PokerDesk.findById(tableId);
+    
+    if (!desk) {
+      console.error(`Desk not found for tableId ${tableId}`);
+      return;
+    }
+    
+    // Update the user's status at the desk
+    await desk.updateSeatStatus(userId, status); // Assuming desk.updateStatus is a defined method
+
+    console.log(`User ${userId} status updated to ${status} at table ${tableId}`);
+  } catch (error) {
+    console.error(`Failed to update seat status for user ${userId} at table ${tableId}: ${error.message}`);
   }
 };
 
+
 // Remove a socket from the registry
+// const removeSocket = (socketId) => {
+//   for (const userId in socketRegistry) {
+//     socketRegistry[userId] = socketRegistry[userId].filter(
+//       (id) => id !== socketId
+//     );
+//     if (socketRegistry[userId].length === 0) {
+//       delete socketRegistry[userId];
+//       console.log(`All sockets removed for user ${userId}`);
+//     }
+//   }
+//   console.log(`Socket ${socketId} removed from registry`);
+// };
+ 
 const removeSocket = (socketId) => {
-  for (const userId in socketRegistry) {
-    socketRegistry[userId] = socketRegistry[userId].filter(
-      (id) => id !== socketId
-    );
-    if (socketRegistry[userId].length === 0) {
-      delete socketRegistry[userId];
-      console.log(`All sockets removed for user ${userId}`);
+  for (const tableId in socketRegistry) {
+    for (const userId in socketRegistry[tableId]) {
+      const socketList = socketRegistry[tableId][userId];
+      const index = socketList.indexOf(socketId);
+      
+      if (index !== -1) {
+        socketList.splice(index, 1); // Remove the socketId
+
+        // If no more sockets exist for this user at this table, update status
+        if (socketList.length === 0) {
+          updateSeatStatus(userId, tableId, 'disconnected'); // Call your status update function
+          delete socketRegistry[tableId][userId];
+          console.log(`All sockets removed for user ${userId} at table ${tableId}`);
+        }
+
+        // If no more users on this table, remove the table from the registry
+        if (Object.keys(socketRegistry[tableId]).length === 0) {
+          delete socketRegistry[tableId];
+        }
+
+        console.log(`Socket ${socketId} removed from registry`);
+        return; // Exit once socket is found and removed
+      }
     }
   }
-  console.log(`Socket ${socketId} removed from registry`);
 };
- 
+
 const sendNecessaryData = async (io, tableId) => {
   try {
     const pokerTable = await PokerDesk.findById(tableId)
@@ -194,13 +249,23 @@ const sendPlayerActionResult = async (io, tableId, actionResult) => {
   }
 };
 
+const checkReconnection = async (tableId, userId) => {
+  
+  const pokerTable = await PokerDesk.findById(tableId);
+  const isAlreadySeated = await pokerTable.isUserSeated(userId);
+  if (isAlreadySeated) {
+    await pokerTable.updateSeatStatus(userId,"active");
+  }
+ 
+}
+
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log("Initializing new Socket.io server...");
     const io = new Server(res.socket.server, {
       path: "/api/socket",
       cors: {
-        origin: ["http://localhost:8081", "http://192.168.1.9:3000"], // Allowed origins
+        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"], // Allowed origins
       },
     });
     res.socket.server.io = io;
@@ -212,18 +277,39 @@ export default function handler(req, res) {
       let currentTableId = null;
       let currentGameId = null;
       // User registration with JWT
-      socket.on("register", ({ token }) => {
+      // socket.on("register", ({ token, tableId }) => {
+      //   try {
+      //     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      //     currentUserId = decoded.userId;
+      //     console.log(`User ${currentUserId} registered`);
+
+      //     addSocket(currentUserId,tableId, socket.id);
+      //   } catch (error) {
+      //     console.error("User registration error:", error.message);
+      //     socket.emit("error", { message: "Invalid token" });
+      //   }
+      // });
+
+      socket.on("register", ({ token, tableId }) => {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          currentUserId = decoded.userId;
-          console.log(`User ${currentUserId} registered`);
-
-          addSocket(currentUserId, socket.id);
+          const currentUserId = decoded.userId; // Avoid global variables for each socket instance
+          console.log(`User ${currentUserId} registered at table ${tableId}`);
+          console.log("socket registry",socketRegistry);
+          // Add the socket to the registry with userId, tableId, and socket.id
+          addSocket(currentUserId, tableId, socket.id);
+          console.log("socket registry",socketRegistry);
+          // Emit an event confirming registration success (optional)
+          socket.emit("registrationSuccess", { message: "User registered successfully" });
+      
+          // Optionally check and update seat status if reconnecting
+          //handleReconnection(currentUserId, tableId, socket.id);
         } catch (error) {
           console.error("User registration error:", error.message);
           socket.emit("error", { message: "Invalid token" });
         }
       });
+      
 
       // Join a table
       socket.on("joinTable", async ({ token, tableId }) => {
@@ -234,6 +320,16 @@ export default function handler(req, res) {
 
           socket.join(`table-${tableId}`);
           console.log(`User ${userId} joined table room ${tableId}`);
+
+         // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+         // const currentUserId = decoded.userId; // Avoid global variables for each socket instance
+          console.log(`User ${currentUserId} registered at table ${tableId}`);
+          console.log("socket registry",socketRegistry);
+          // Add the socket to the registry with userId, tableId, and socket.id
+          addSocket(userId, tableId, socket.id);
+          console.log("socket registry",socketRegistry);
+          // Emit an event confirming registration success (optional)
+          socket.emit("registrationSuccess", { message: "User registered successfully" });
 
           const pokerTable = await PokerDesk.findById(tableId);
           if (!pokerTable) throw new Error("Poker table not found");
