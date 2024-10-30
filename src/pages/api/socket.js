@@ -269,15 +269,25 @@ export default function handler(req, res) {
     //   },
     // });
     
+    // const io = new Server(res.socket.server, {
+    //   path: "/api/socket",
+    //   cors: {
+    //     origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"],
+    //     methods: ["GET", "POST"],
+    //     credentials: true, // Allow credentials if needed
+    //   },
+    // });
+
+    console.log('Setting up Socket.io server...');
     const io = new Server(res.socket.server, {
       path: "/api/socket",
       cors: {
-        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"],
+        origin: "*", // Allow all origins
         methods: ["GET", "POST"],
-        credentials: true, // Allow credentials if needed
       },
+      transports: ["polling"], // Use polling only
     });
-    
+
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
