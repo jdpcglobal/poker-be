@@ -262,6 +262,12 @@ const checkReconnection = async (tableId, userId) => {
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log("Initializing new Socket.io server...");
+    const io = new Server(res.socket.server, {
+      path: "/api/socket",
+      cors: {
+        origin: "*", // Allowed origins
+      },
+    });
     // const io = new Server(res.socket.server, {
     //   path: "/api/socket",
     //   cors: {
@@ -279,14 +285,13 @@ export default function handler(req, res) {
     // });
 
     console.log('Setting up Socket.io server...');
-    const io = new Server(res.socket.server, {
-      path: "/api/socket",
-      cors: {
-        origin: "*", // Allow all origins
-        methods: ["GET", "POST"],
-      },
-      transports: ["polling"], // Use polling only
-    });
+    // const io = new Server(res.socket.server, {
+    //   path: "/api/socket",
+    //   cors: {
+    //     origin: "*", // Allow all origins
+    //     methods: ["GET", "POST"],
+    //   },
+    // });
 
     res.socket.server.io = io;
 
