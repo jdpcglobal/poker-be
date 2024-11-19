@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link';
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import useSocket from '../../hooks/useSocket'
+import useSocket from '../../../hooks/useSocket'
 interface Poker {
   _id: string;
   name: string;
@@ -106,28 +106,22 @@ const PokerAdmin: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4">
-   <div className="flex justify-between items-center mb-6 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 p-3 rounded-lg">
-  <h2 className="text-2xl font-semibold text-left text-white flex-grow">
-    Poker Games
-  </h2>
-
-  {/* Button to open the modal */}
-  <button
-    onClick={() => setIsModalOpen(true)}
-    className="px-6 py-3 bg-yellow-400 text-black font-bold rounded-lg hover:bg-yellow-500 transition-all duration-300"
-  >
-    Create Poker Game
-  </button>
-</div>
-
-
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Poker Admin Panel</h1>
+      
+      {/* Button to open the modal */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="mb-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+      >
+        Create Poker Game
+      </button>
 
       {/* Modal for creating poker game */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Create Poker Game</h2>
+            <h2 className="text-xl font-semibold mb-4">api/admin/poker Poker Game</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium">Name:</label>
@@ -231,42 +225,54 @@ const PokerAdmin: React.FC = () => {
 
       {/* List of Poker Games */}
       <section>
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {pokers.map((poker) => (
-      <div key={poker._id} className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-        <div className="p-4">
-          <h3 className="text-xl font-semibold text-gray-800">{poker.name}</h3>
-          <p className="text-gray-600 mt-2">Community Cards: {poker.communityCardsCount}</p>
-          <p className="text-gray-600">Max Hole Cards: {poker.maxHoleCards}</p>
-          <p className="text-gray-600">Rounds: {poker.numberOfRounds}</p>
-          <p className="text-gray-600">Blinds/Antes: {poker.blindsOrAntes}</p>
-          <p className="text-gray-600">Objective: {poker.objective}</p>
-          <p className={`text-sm mt-3 ${poker.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
-            Status: {poker.status}
-          </p>
+        <h2 className="text-xl font-semibold mb-4">Poker Games</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white">
+            <thead>
+              <tr>
+                <th className="py-2 px-4 bg-gray-100 border-b">Name</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Community Cards</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Max Hole Cards</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Rounds</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Blinds/Antes</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Objective</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Status</th>
+                <th className="py-2 px-4 bg-gray-100 border-b">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pokers.map((poker) => (
+                <tr key={poker._id}>
+                  <td className="py-2 px-4 border-b">{poker.name}</td>
+                  <td className="py-2 px-4 border-b">{poker.communityCardsCount}</td>
+                  <td className="py-2 px-4 border-b">{poker.maxHoleCards}</td>
+                  <td className="py-2 px-4 border-b">{poker.numberOfRounds}</td>
+                  <td className="py-2 px-4 border-b">{poker.blindsOrAntes}</td>
+                  <td className="py-2 px-4 border-b">{poker.objective}</td>
+                  <td className="py-2 px-4 border-b">{poker.status}</td>
+                  <td className="py-2 px-4 border-b">
+                    <button
+                      onClick={() => startEditing(poker)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(poker._id)}
+                      className="ml-4 text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                    <Link href={`/admin/pokerMode/${poker._id}`}>
+                     details
+                     </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div className="flex justify-between p-4 bg-gray-100">
-          <button
-            onClick={() => startEditing(poker)}
-            className="text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => handleDelete(poker._id)}
-            className="text-red-600 hover:text-red-800 font-medium"
-          >
-            Delete
-          </button>
-          <Link href={`/admin/pokerMode/${poker._id}`}>
-            <span className="text-indigo-600 hover:text-indigo-800 font-medium">Details</span>
-          </Link>
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-
+      </section>
 
       {/* Modal for editing poker game */}
       {editingPoker && editingPokerId && (

@@ -1,9 +1,9 @@
 import dbConnect from '@/config/dbConnect';
 import User from '@/models/user'; // Import your User model
+import BankAccount from '@/models/bankAccount'; // Import the BankAccount model
 import { verifyToken } from '@/utils/jwt'; // Import your JWT verification function
-import { IBankAccount } from '@/models/user'; // Import the IBankAccount interface
 
-export default async function handler(req , res) {
+export default async function handler(req, res) {
   // Connect to the database
   await dbConnect();
 
@@ -24,9 +24,10 @@ export default async function handler(req , res) {
     // Verify token and extract user ID
     const decoded = verifyToken(token);
     const userId = decoded?.userId; // Assuming your token includes userId
-     if(!userId){
-       return res.status(401).json({ message: 'Authorization token is not valid' });
-     }
+    if (!userId) {
+      return res.status(401).json({ message: 'Authorization token is not valid' });
+    }
+
     // Destructure the request body
     const { accountNumber, bankName, ifscCode, accountHolderName } = req.body;
 
@@ -43,22 +44,23 @@ export default async function handler(req , res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Create a new bank account object
-    const newBankAccount = {
+    // Create a new bank account document
+    const newBankAccount = new BankAccount({
+      userId, // Reference to the user
       accountNumber,
       bankName,
       ifscCode,
       accountHolderName,
-    };
+    });
 
-    // Add the new bank account to the user's bankAccounts array
-    user.bankAccounts.push(newBankAccount);
-
-    // Save the updated user document
-    await user.save();
+    // Save the new bank account to the database
+    await newBankAccount.save();
 
     // Return success response
-    return res.status(201).json({ message: 'Bank account added successfully', bankAccount: newBankAccount });
+    return res.status(201).json({
+      message: 'Bank account added successfully',
+      bankAccount: newBankAccount,
+    });
   } catch (error) {
     console.error('Error adding bank account:', error);
     return res.status(500).json({ message: 'Internal server error' });

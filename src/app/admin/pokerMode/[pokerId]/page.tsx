@@ -144,17 +144,25 @@ const PokerModeAdmin: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Poker Mode Admin Panel</h1>
+    <div className="container mx-auto px-4 pb-8">
+    
+    <div className="flex justify-between items-center mb-6 bg-gradient-to-r from-green-500 via-teal-400 to-cyan-500 px-4 py-2 rounded-lg">
+  <h1 className="text-2xl font-bold text-white flex-grow">
+    Poker Mode
+  </h1>
 
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="mb-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-      >
-        Create Poker Mode
-      </button>
+  {/* Button to open the modal */}
+  <button
+    onClick={() => setIsModalOpen(true)}
+    className="px-6 py-3 bg-orange-400 text-black font-bold rounded-lg hover:bg-orange-500 transition-all duration-300"
+  >
+    Create Poker Mode
+  </button>
+</div>
 
-      <div className="overflow-x-auto">
+
+
+      {/* <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -200,7 +208,45 @@ const PokerModeAdmin: React.FC = () => {
             ))}
           </tbody>
         </table>
+      </div> */}
+
+      <section> 
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {pokerModes.map((pokerMode) => (
+      <div key={pokerMode._id} className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+        <div className="p-6">
+          <h3 className="text-xl font-semibold text-gray-800">Poker ID: {pokerMode.pokerId}</h3>
+          <p className="text-gray-600 mt-2">Stake: {pokerMode.stake}</p>
+          <p className="text-gray-600">Min Buy-In: {pokerMode.minBuyIn}</p>
+          <p className="text-gray-600">Max Buy-In: {pokerMode.maxBuyIn}</p>
+          <p className="text-gray-600">Max Player Count: {pokerMode.maxPlayerCount}</p>
+          <p className="text-gray-600">Blinds/Antes: {pokerMode.blindsOrAntes}</p>
+          <p className={`text-sm mt-3 ${pokerMode.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+            Status: {pokerMode.status}
+          </p>
+        </div>
+        <div className="flex justify-between p-4 bg-gray-100">
+          <button
+            onClick={() => startEditing(pokerMode)}
+            className="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 font-medium"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(pokerMode._id)}
+            className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
+          >
+            Delete
+          </button>
+          <Link href={`/admin/pokerDesk/${pokerMode._id}`}>
+            <span className="text-indigo-600 hover:text-indigo-800 font-medium">Details</span>
+          </Link>
+        </div>
       </div>
+    ))}
+  </div>
+</section>
+
 
       {isModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-gray-900 bg-opacity-50">

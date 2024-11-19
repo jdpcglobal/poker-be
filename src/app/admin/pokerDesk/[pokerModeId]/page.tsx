@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
+import Link from 'next/link';
 
 interface Seat {
   seatNumber: number;
@@ -10,6 +11,27 @@ interface Seat {
   balanceAtTable: number;
   isSittingOut: boolean;
 }
+
+interface TopWinner {
+  userId: string;
+  username: string;
+  totalWinAmount: number;
+  totalBet: number;
+}
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value }) => (
+  <div className="bg-white rounded-lg shadow-lg p-6 mb-4 w-full">
+    <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+    <p className="text-xl font-bold text-indigo-600">{value}</p>
+  </div>
+);
+
+
 
 interface PokerDesk {
   _id: string;
@@ -37,9 +59,30 @@ const PokerDeskAdmin: React.FC = () => {
     currentGameStatus: 'waiting',
     totalBuyIns: 0
   });
+  const [stats, setStats] = useState<any>(null);
   const [editingPokerDesk, setEditingPokerDesk] = useState<Partial<PokerDesk>>({});
   const [editingPokerDeskId, setEditingPokerDeskId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (pokerModeId) {
+      const fetchPokerStats = async () => {
+        try {
+          const response = await axios.get(`/api/admin/auth/getGameData`, {
+            params: { pokerModeId },
+          });
+          console.log(response.data.data);
+          setStats(response.data.data);
+            // Update state with the fetched stats
+        } catch (error) {
+          console.error('Failed to fetch poker stats:', error);
+        }
+      };
+      fetchPokerStats();
+    }
+  }, [pokerModeId]);
+
+
 
   useEffect(() => {
     if (pokerModeId) {
@@ -138,15 +181,86 @@ const PokerDeskAdmin: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Poker Desk Admin Panel</h1>
+    <div className="container mx-auto px-4 pb-4 overflow-auto" style={{maxHeight:'90vh', overflow:'scroll'}}>
+<div className="flex justify-between items-center bg-gradient-to-r  from-blue-500 to-purple-600 p-4 rounded-lg shadow-lg">
+  <h1 className="text-2xl font-bold text-white">
+    Poker Desk
+  </h1>
 
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="mb-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-      >
-        Create Poker Desk
-      </button>
+  {/* Button to open the modal */}
+  <button
+    onClick={() => setIsModalOpen(true)}
+    className="px-6 py-3 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition duration-300 ease-in-out transform hover:scale-105"
+  >
+    Create Poker Desk
+  </button>
+</div>
+
+
+   <div className="container mx-auto px-4 pb-4">
+      {/* <div className="flex justify-between items-center bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-lg shadow-lg">
+        <h1 className="text-2xl font-bold text-white">Poker Mode Stats</h1>
+      </div> */}
+
+      {/* Display the stat cards */}
+      <div className="flex flex-wrap justify-start mt-6">
+        
+      {stats && (
+  <>
+    {/* Overall Stats */}
+    <div className='container flex justify-center items-center'>
+  <div className="flex gap-4">
+    <StatCard title="Total Games Played" value={stats.totalGames} />
+    <StatCard title="Total Bet Amount" value={`$${stats.totalBet}`} />
+  </div>
+</div>
+
+
+    {/* Top Winners Dropdown */}
+    <div className="w-full md:w-1/2 p-4">
+      <h2 className="text-xl font-semibold mb-2 text-gray-800">Top Winners</h2>
+      <div className="bg-gray-50 rounded-lg shadow-lg p-4 mb-4">
+        <details className="group">
+          <summary className="text-lg font-semibold text-gray-700 cursor-pointer">Show Top Winners</summary>
+          <div className="mt-2">
+            {stats.topWinners && stats.topWinners.map((winner: TopWinner) => (
+              <div key={winner.userId} className="bg-gray-100 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-700">Username: {winner.username}</p>
+                <p className="text-sm text-gray-700">Total Win: ${winner.totalWinAmount}</p>
+                <p className="text-sm text-gray-700">Total Bet: ${winner.totalBet}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+    </div>
+
+    {/* Top Contributors Dropdown */}
+    <div className="w-full md:w-1/2 p-4">
+      <h2 className="text-xl font-semibold mb-2 text-gray-800">Top Contributors</h2>
+      <div className="bg-gray-50 rounded-lg shadow-lg p-4 mb-4">
+        <details className="group">
+          <summary className="text-lg font-semibold text-gray-700 cursor-pointer">Show Top Contributors</summary>
+          <div className="mt-2">
+            {stats.topContributors && stats.topContributors.map((contributor: any) => (
+              <div key={contributor.userId} className="bg-gray-100 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-700">Username: {contributor.username}</p>
+                <p className="text-sm text-gray-700">Total Contributed: ${contributor.totalContributed}</p>
+                <p className="text-sm text-gray-700">Total Bet: ${contributor.totalBet}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+    </div>
+
+    {/* Win Rate Stats */}
+     
+  </>
+)}
+
+      </div>
+    </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -179,6 +293,11 @@ const PokerDeskAdmin: React.FC = () => {
                   >
                     Delete
                   </button>
+                  <Link href={`/admin/pokerDesk/details/${pokerDesk._id}`}>
+                   <button className=" ml-2 px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                      Details
+                       </button>
+                    </Link>
                 </td>
               </tr>
             ))}

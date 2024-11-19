@@ -957,6 +957,6 @@ for (const pot of potResults) {
 };
 
 
-const PokerDesk = mongoose.models.Pokerdesk || mongoose.model<IPokerTable>('Pokerdesk', PokerDeskSchema);
+const PokerDesk = mongoose.models.PokerDesk || mongoose.model<IPokerTable>('PokerDesk', PokerDeskSchema);
  
 export default PokerDesk;

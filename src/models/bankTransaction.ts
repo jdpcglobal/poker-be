@@ -1,6 +1,7 @@
-import mongoose, { Schema, Model, Document } from 'mongoose';
-
-// Define the interface for Bank Transaction
+// bankTransaction.ts (Bank Transaction Model)
+import mongoose, { Schema, Document } from 'mongoose';
+import BankAccount from './bankAccount'; // Import BankAccount model
+import User from './user'
 export interface IBankTransaction extends Document {
   userId: mongoose.Types.ObjectId; // Reference to User
   bankId: mongoose.Types.ObjectId; // Reference to BankAccount
@@ -12,15 +13,15 @@ export interface IBankTransaction extends Document {
   remark?: string;
 }
 
-// Define the Bank Transaction Schema
 const BankTransactionSchema: Schema<IBankTransaction> = new Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Reference to the User model
+    ref: 'User',
     required: true,
   },
   bankId: {
     type: mongoose.Schema.Types.ObjectId,
+    ref: 'BankAccount', // Reference to BankAccount model
     required: true,
   },
   createdOn: { type: Date, default: Date.now },
@@ -39,7 +40,6 @@ const BankTransactionSchema: Schema<IBankTransaction> = new Schema({
   remark: { type: String },
 });
 
-// Create the Bank Transaction Model
-const BankTransaction: Model<IBankTransaction> = mongoose.models.BankTransaction || mongoose.model<IBankTransaction>('BankTransaction', BankTransactionSchema);
+const BankTransaction = mongoose.models.BankTransaction || mongoose.model<IBankTransaction>('BankTransaction', BankTransactionSchema);
 
 export default BankTransaction;

@@ -1,5 +1,6 @@
 import dbConnect from '@/config/dbConnect';
 import BankTransaction from '@/models/bankTransaction'; // Assuming this is your BankTransaction model
+import BankAccount from '@/models/bankAccount'; // Import the BankAccount model
 import User from '@/models/user'; // Assuming this is your User model
 import { verifyToken } from '@/utils/jwt'; // Utility to verify token
 
@@ -31,20 +32,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Bank ID, amount, and type are required' });
     }
 
-    // Find the user and populate bank accounts
-    const user = await User.findById(userId).select('bankAccounts');
+    // Find the user to ensure the user exists
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if user has any bank accounts
-    if (user.bankAccounts.length === 0) {
-      return res.status(400).json({ message: 'Please add a bank account before making a transaction.' });
-    }
-
-    // Check if the provided bankId matches any of the user's bank accounts
-    const isBankIdValid = user.bankAccounts.some((bankAccount) => bankAccount._id.equals(bankId));
-    if (!isBankIdValid) {
+    // Find the bank account by bankId and check if it belongs to the user
+    const bankAccount = await BankAccount.findOne({ _id: bankId, userId });
+    if (!bankAccount) {
       return res.status(400).json({ message: 'Invalid bank account ID. Please use a linked bank account.' });
     }
 
@@ -66,6 +62,7 @@ export default async function handler(req, res) {
     return res.status(201).json({ message: 'Bank transaction created successfully', transaction });
   } catch (error) {
     // Handle errors
+    console.error('Error creating bank transaction:', error);
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
 }
