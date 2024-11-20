@@ -23,7 +23,7 @@ export default function Login() {
                 // Example: localStorage.setItem('token', response.data.token);
     
                 // Redirect to the admin page
-                router.push('/admin');
+                router.push('/admin/stastics');
             }
             // You can redirect or store the token in localStorage or cookie
         } catch (err) {
