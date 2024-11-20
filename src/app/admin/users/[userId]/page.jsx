@@ -268,18 +268,11 @@ import { IUser } from '@/utils/pokerModelTypes';
 import mongoose from 'mongoose';
 import User from '@/models/user';
 import BankTransaction from '@/models/bankTransaction';
-import PokerGameArchive from '@/models/pokerGameArchive';
-
-interface UserDetailsProps {
-  user: IUser;
-  bankTransactions: any[];
-  gameStats: any[];
-  walletTransactions: any[];
-}
+import PokerGameArchive from '@/models/pokerGameArchive'; 
 
 export const dynamic = 'force-dynamic'; // to ensure page is server-rendered dynamically
 
-const UserDetails = async ({ params }: { params: { userId: string } }) => {
+const UserDetails = async ({params}) => {
   const { userId } = params;
 
   // Fetch user data from MongoDB using Mongoose
@@ -382,8 +375,8 @@ const UserDetails = async ({ params }: { params: { userId: string } }) => {
               <summary className="cursor-pointer text-lg font-medium text-gray-700">Show Wallet Transactions</summary>
               <div className="mt-2 space-y-2">
                 {walletTransactions.length > 0 ? (
-                  walletTransactions.map((txn) => (
-                    <div key={txn._id} className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                  walletTransactions.map((txn, index) => (
+                    <div key={index} className="bg-gray-50 p-4 rounded-lg shadow-sm">
                       <p className="text-sm text-gray-500">{txn.createdOn.toLocaleString()}</p>
                       <p className={`text-lg font-medium ${txn.status === 'completed' ? 'text-green-500' : 'text-red-500'}`}>
                         {txn.type} - ${txn.amount.toFixed(2)}
