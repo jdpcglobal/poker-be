@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Link from 'next/link';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -196,12 +197,13 @@ const UserManagementPage = () => {
                   >
                     Edit
                   </button>
-                  <button
-                    onClick={() => console.log(`Details of user: ${user._id}`)}
-                    className="w-full px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                  >
-                    Details
-                  </button>
+                <button
+  className="w-full px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+>
+  <Link href={`/admin/users/${user._id}`} passHref>
+    Details
+  </Link>
+</button>
                 </td>
               </tr>
             ))}
