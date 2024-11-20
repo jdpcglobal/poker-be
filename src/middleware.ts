@@ -4,11 +4,16 @@ import { jwtVerify } from 'jose';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
+export const config = {
+  matcher: ['/admin/:path*', '/auth/login'],
+};
+
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const isPrivatePath = ['/admin'].includes(path); // Path that requires authentication
+  const isPrivatePath = path.startsWith('/admin'); // Path that requires authentication
+  console.log("isPrivatePath",isPrivatePath);
   const token = req.cookies.get('token')?.value || '';
-
+  console.log('Middleware path:', req.nextUrl.pathname);
   // Check if token is present
   if (token) {
     try {
@@ -53,10 +58,9 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
+
 // Matcher configuration to apply middleware to specific routes
-export const config = {
-  matcher: ['/admin/**', '/auth/login'], // Matches /admin/* and /auth/login
-};
+
 
 
 // import { NextResponse, type NextRequest } from 'next/server';
