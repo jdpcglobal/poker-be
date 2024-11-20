@@ -136,6 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return {
         _id: user._id,
         username: user.username,
+        status:user.status,
         mobileNumber: user.mobileNumber,
         walletBalance: user.wallet.balance, // Directly use wallet balance
         totalDeposit, // Calculated from wallet transactions
