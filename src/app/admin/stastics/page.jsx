@@ -36,6 +36,7 @@ const Dashboard = () => {
     <div className="p-6 bg-gray-100 min-h-screen">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Users Stats */}
+        
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex items-center space-x-4">
             <UserIcon className="h-8 w-8 text-blue-500" />
