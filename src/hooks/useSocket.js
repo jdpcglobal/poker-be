@@ -11,7 +11,7 @@ const useSocket = (username) => {
     }
 
     // Initialize socket connection
-    const socketIo = io('delightful-coast-006df5400.5.azurestaticapps.net', {
+    const socketIo = io('', {
       path: '/api/socket',
     });
 
