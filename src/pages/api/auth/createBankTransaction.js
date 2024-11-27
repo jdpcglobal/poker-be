@@ -1,14 +1,14 @@
 import dbConnect from '@/config/dbConnect';
-import BankTransaction from '@/models/bankTransaction'; // Assuming this is your BankTransaction model
-import BankAccount from '@/models/bankAccount'; // Import the BankAccount model
-import User from '@/models/user'; // Assuming this is your User model
-import { verifyToken } from '@/utils/jwt'; // Utility to verify token
+import BankTransaction from '@/models/bankTransaction';
+import BankAccount from '@/models/bankAccount';
+import User from '@/models/user';
+import { verifyToken } from '@/utils/jwt';
 
 export default async function handler(req, res) {
   // Connect to the database
   await dbConnect();
 
-  // Only allow POST requests
+  // Allow only POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -16,32 +16,50 @@ export default async function handler(req, res) {
   // Get the token from the Authorization header
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    return res.status(401).json({ message: 'Authorization token is required' });
+    return res.status(401).json({ message: 'Authorization token is required.' });
   }
 
   try {
-    // Verify the token and extract user ID
+    // Verify the token
     const decoded = verifyToken(token);
-    const userId = decoded.userId; // Assuming userId is stored in the token
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ message: 'Invalid or expired token. Please login again!' });
+    }
 
-    // Get parameters from request body
-    const { bankId, amount, type, remark } = req.body;
+    const userId = decoded.userId;
+
+    // Extract parameters from request body
+    const { bankId, amount, type, remark, imageUrl } = req.body;
 
     // Validate required fields
-    if (!bankId || !amount || !type) {
-      return res.status(400).json({ message: 'Bank ID, amount, and type are required' });
+    if (!bankId || !amount || !type || !imageUrl) {
+      return res.status(400).json({
+        message: 'Bank ID, amount, type, and image URL are required.',
+      });
     }
 
-    // Find the user to ensure the user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Check if the user exists and is active
+    const user = await User.findById(userId).select('_id status');
+    if (!user || user.status !== 'active') {
+      return res.status(404).json({
+        message: 'User not found or the user account is suspended.',
+      });
     }
 
-    // Find the bank account by bankId and check if it belongs to the user
+    // Validate the bank account
     const bankAccount = await BankAccount.findOne({ _id: bankId, userId });
     if (!bankAccount) {
-      return res.status(400).json({ message: 'Invalid bank account ID. Please use a linked bank account.' });
+      return res.status(400).json({
+        message: 'Invalid bank account ID. Please use a linked bank account.',
+      });
+    }
+
+    // Validate transaction type
+    const validTypes = ['deposit', 'withdraw'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        message: `Invalid transaction type. Allowed values: ${validTypes.join(', ')}.`,
+      });
     }
 
     // Create a new bank transaction
@@ -51,18 +69,24 @@ export default async function handler(req, res) {
       amount,
       type,
       remark,
+      imageUrl,
       createdOn: new Date(),
-      status: 'waiting', // Set initial status
+      status: 'waiting', // Default status
     });
 
     // Save the transaction to the database
     await transaction.save();
 
     // Respond with success
-    return res.status(201).json({ message: 'Bank transaction created successfully', transaction });
+    return res.status(201).json({
+      message: 'Bank transaction created successfully.',
+      transaction,
+    });
   } catch (error) {
-    // Handle errors
-    console.error('Error creating bank transaction:', error);
-    return res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error creating bank transaction:', error.stack);
+    return res.status(500).json({
+      message: 'Server error while creating bank transaction.',
+      error: error.message,
+    });
   }
 }

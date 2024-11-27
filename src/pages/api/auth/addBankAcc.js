@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     // Destructure the request body
-    const { accountNumber, bankName, ifscCode, accountHolderName } = req.body;
+    const { accountNumber, bankName, ifscCode, accountHolderName, isDefault = false } = req.body;
 
     // Validate request parameters
     if (!accountNumber || !bankName || !ifscCode || !accountHolderName) {
@@ -37,20 +37,34 @@ export default async function handler(req, res) {
     }
 
     // Find user by userId
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('_id status');
 
     // Check if the user exists
-    if (!user) {
+    if (!user._id) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Create a new bank account document
+    // Check if the user's status is active
+    if (user.status !== 'active') {
+      return res.status(404).json({ message: `Account is ${user.status}` });
+    }
+
+    // If isDefault is true, make all other bank accounts with isDefault true to false
+    if (isDefault) {
+      await BankAccount.updateMany(
+        { userId: user._id, isDefault: true },
+        { $set: { isDefault: false } }
+      );
+    }
+
+    // Create a new bank account document with the requested fields
     const newBankAccount = new BankAccount({
-      userId, // Reference to the user
+      userId: user._id, // Reference to the user
       accountNumber,
       bankName,
       ifscCode,
       accountHolderName,
+      isDefault, // Set isDefault based on request
     });
 
     // Save the new bank account to the database

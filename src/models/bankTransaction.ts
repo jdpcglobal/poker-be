@@ -2,6 +2,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import BankAccount from './bankAccount'; // Import BankAccount model
 import User from './user'
+
 export interface IBankTransaction extends Document {
   userId: mongoose.Types.ObjectId; // Reference to User
   bankId: mongoose.Types.ObjectId; // Reference to BankAccount
@@ -11,6 +12,7 @@ export interface IBankTransaction extends Document {
   amount: number;
   type: 'deposit' | 'withdraw';
   remark?: string;
+  imageUrl: string; // New imageUrl field
 }
 
 const BankTransactionSchema: Schema<IBankTransaction> = new Schema({
@@ -38,6 +40,10 @@ const BankTransactionSchema: Schema<IBankTransaction> = new Schema({
     required: true,
   },
   remark: { type: String },
+  imageUrl: { 
+    type: String, 
+    required: true, // Making imageUrl required
+  },
 });
 
 const BankTransaction = mongoose.models.BankTransaction || mongoose.model<IBankTransaction>('BankTransaction', BankTransactionSchema);

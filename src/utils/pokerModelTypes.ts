@@ -160,16 +160,17 @@ export interface IWallet {
 
 export interface IUser extends Document {
   mobileNumber: string;
-  username: string;
-  balance: number;
-  gamesPlayed: number;
-  gamesWon: number;
-  totalWinnings: number;
+  username: string; 
   registrationDate: Date;
   lastLogin: Date;
   isActive: boolean;
   status: string;
   wallet: IWallet;
   bankAccounts: IBankAccount[];
-  updateLastLogin(): Promise<void>;
+  deviceInfo: string;       // Device information string (e.g., browser or device details)
+  ipAddress: string;        // IP address of the user
+  deviceType: string;       // Device type (default to 'android')
+  latitude?: number;        // Optional latitude for location
+  longitude?: number;       // Optional longitude for location
+  updateLastLogin(req: Request): Promise<void>;
 }

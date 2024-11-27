@@ -7,6 +7,8 @@ export interface IBankAccount extends Document {
   bankName: string;
   ifscCode: string;
   accountHolderName: string;
+  isDefault: boolean; // New isDefault field
+  status: 'active' | 'blocked' | 'inactive'; // New status field
 }
 
 const BankAccountSchema: Schema<IBankAccount> = new Schema({
@@ -19,6 +21,17 @@ const BankAccountSchema: Schema<IBankAccount> = new Schema({
   bankName: { type: String, required: true },
   ifscCode: { type: String, required: true },
   accountHolderName: { type: String, required: true },
+  isDefault: { 
+    type: Boolean, 
+    default: false, // Default to false
+    required: true 
+  },
+  status: {
+    type: String,
+    enum: ['active', 'blocked', 'inactive'],
+    default: 'active', // Default to 'active'
+    required: true,
+  },
 });
 
 const BankAccount = mongoose.models.BankAccount || mongoose.model<IBankAccount>('BankAccount', BankAccountSchema);
