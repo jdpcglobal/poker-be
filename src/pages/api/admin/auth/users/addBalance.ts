@@ -5,7 +5,7 @@ import dbConnect from '../../../../../config/dbConnect';
 import User from '../../../../../models/user';
 import { verifyToken } from '../../../../../utils/jwt';
 import cookie from 'cookie';
-import { IWalletTransaction } from '@/utils/pokerModelTypes';
+import { IWalletTransaction, IAmountBreakdown } from '@/utils/pokerModelTypes';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await dbConnect();
@@ -24,11 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
-    const { userId,bonusAmount, remark, action } = req.body;
-    console.log("req.query",req.query);
-    console.log("req.body",req.body);
-    console.log("amount",bonusAmount);
+    const { userId, bonusAmount, remark, action } = req.body;
 
+    // Input validation
     if (!bonusAmount || bonusAmount <= 0) {
       return res.status(400).json({ message: 'Invalid amount. Must be a positive number.' });
     }
@@ -46,23 +44,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Create the amount breakdown
+    const amountBreakdown: IAmountBreakdown = {
+      cashAmount: 0, // Adjust if there's a cash portion
+      instantBonus: 0, // Adjust if there's an instant bonus portion
+      lockedBonus: bonusAmount, // Focus on lockedBonus for this action
+      gst: 0, // Adjust if there's GST
+      tds: 0, // Adjust if there's TDS deductions
+      otherDeductions: 0, // Adjust for other deductions if needed
+      total: bonusAmount, // The total is equal to the bonus amount for now
+    };
+
+    // Adjust lockedBonus based on action
     if (action === 'add') {
-      // Add amount to wallet balance and bonus
-      user.wallet.balance += bonusAmount;
-      user.wallet.bonus += bonusAmount;
+      user.wallet.lockedBonus += bonusAmount;
     } else if (action === 'remove') {
-      // Deduct amount from wallet balance and bonus, ensuring no negative balance
-      if (user.wallet.balance < bonusAmount) {
-        return res.status(400).json({ message: 'Insufficient balance to remove the specified amount.' });
+      if (user.wallet.lockedBonus < bonusAmount) {
+        return res.status(400).json({ message: 'Insufficient locked bonus to remove the specified amount.' });
       }
-      user.wallet.balance -= bonusAmount;
-      user.wallet.bonus = Math.max(0, user.wallet.bonus - bonusAmount);
+      user.wallet.lockedBonus -= bonusAmount;
     }
 
     // Create a wallet transaction
     const walletTransaction: IWalletTransaction = {
       status: 'completed',
-      amount: action === 'add' ? bonusAmount : -bonusAmount,
+      amount: amountBreakdown,
       type: 'bonus',
       remark,
       createdOn: new Date(),

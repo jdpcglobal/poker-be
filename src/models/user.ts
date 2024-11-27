@@ -1,12 +1,23 @@
 
-import { IUser, IWallet, IWalletTransaction } from '@/utils/pokerModelTypes';
+import { IUser, IWallet, IWalletTransaction, IAmountBreakdown } from '@/utils/pokerModelTypes';
 import mongoose, { Schema, Model, Document } from 'mongoose';
+
+const AmountBreakdownSchema : Schema<IAmountBreakdown> = new Schema({
+  cashAmount: { type: Number, default: 0 }, // Cash portion of the transaction
+  instantBonus: { type: Number, default: 0 }, // Instant bonus portion
+  lockedBonus: { type: Number, default: 0 }, // Locked bonus portion
+  gst: { type: Number, default: 0 }, // GST portion
+  tds: { type: Number, default: 0 }, // TDS deductions
+  otherDeductions: { type: Number, default: 0 }, // Additional deductions, if any
+  total: { type: Number, required: true }, // Total transaction amount
+});
+
 
 const WalletTransactionSchema: Schema<IWalletTransaction> = new Schema({
   createdOn: { type: Date, default: Date.now },
   completedOn: { type: Date },
   status: { type: String, enum: ['failed', 'completed', 'successful'], required: true },
-  amount: { type: Number, required: true },
+  amount: { type: AmountBreakdownSchema, required: true }, // Nested breakdown for amounts
   type: {
     type: String,
     enum: ['deposit', 'withdraw', 'deskIn', 'deskWithdraw', 'bonus'],
@@ -19,7 +30,8 @@ const WalletTransactionSchema: Schema<IWalletTransaction> = new Schema({
 
 const WalletSchema: Schema<IWallet> = new Schema({
   balance: { type: Number, default: 0, min: 0 },
-  bonus: { type: Number, default: 0, min: 0 },
+  instantBonus: { type: Number, default: 0, min: 0 },
+  lockedBonus: { type: Number, default: 0 },
   transactions: [WalletTransactionSchema],
 });
 

@@ -45,23 +45,53 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Determine wallet operation based on type and status change
+    // Breakdown and wallet operation logic
+    const mainAmount = transaction.amount;
+
+    // Calculate breakdown
+    const cashAmount = mainAmount / 1.28;
+    const gstAmount = mainAmount - cashAmount;
+    const instantBonus = gstAmount; // Instant bonus equals GST
+
     if (transaction.type === 'deposit') {
       // Deposit transaction mechanism
       if (['failed', 'waiting'].includes(transaction.status) && newStatus === 'completed') {
-        user.wallet.balance += transaction.amount;
+        // Update user wallet
+        user.wallet.balance += cashAmount;
+        user.wallet.balance += instantBonus; // Add GST as instant bonus
+
+        // Add wallet transaction
         user.wallet.transactions.push({
-          amount: transaction.amount,
+          amount: {
+            cashAmount,
+            instantBonus,
+            lockedBonus: 0,
+            gst: gstAmount,
+            tds: 0,
+            otherDeductions: 0,
+            total: mainAmount,
+          },
           status: 'completed',
           type: 'deposit',
           remark: 'Bank transaction completed',
         });
       } else if (transaction.status === 'completed' && ['failed', 'waiting'].includes(newStatus)) {
-        if (user.wallet.balance >= transaction.amount) {
-          user.wallet.balance -= transaction.amount;
+        if (user.wallet.balance >= mainAmount) {
+          user.wallet.balance -= cashAmount;
+          user.wallet.balance -= instantBonus; // Remove GST as instant bonus
+
+          // Add wallet transaction for reversal
           user.wallet.transactions.push({
-            amount: transaction.amount,
-            status: 'completed',
+            amount: {
+              cashAmount: -cashAmount,
+              instantBonus: -instantBonus,
+              lockedBonus: 0,
+              gst: -gstAmount,
+              tds: 0,
+              otherDeductions: 0,
+              total: -mainAmount,
+            },
+            status: 'reversed',
             type: 'withdraw',
             remark: 'Bank transaction reverted',
           });
@@ -72,10 +102,21 @@ export default async function handler(req, res) {
     } else if (transaction.type === 'withdraw') {
       // Withdraw transaction mechanism (reverse of deposit)
       if (['failed', 'waiting'].includes(transaction.status) && newStatus === 'completed') {
-        if (user.wallet.balance >= transaction.amount) {
-          user.wallet.balance -= transaction.amount;
+        if (user.wallet.balance >= mainAmount) {
+          user.wallet.balance -= cashAmount;
+          user.wallet.balance -= instantBonus;
+
+          // Add wallet transaction for completed withdrawal
           user.wallet.transactions.push({
-            amount: transaction.amount,
+            amount: {
+              cashAmount,
+              instantBonus,
+              lockedBonus: 0,
+              gst: gstAmount,
+              tds: 0,
+              otherDeductions: 0,
+              total: mainAmount,
+            },
             status: 'completed',
             type: 'withdraw',
             remark: 'Bank transaction completed',
@@ -84,10 +125,21 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Insufficient balance for this transaction' });
         }
       } else if (transaction.status === 'completed' && ['failed', 'waiting'].includes(newStatus)) {
-        user.wallet.balance += transaction.amount;
+        user.wallet.balance += cashAmount;
+        user.wallet.balance += instantBonus;
+
+        // Add wallet transaction for the reverted withdrawal
         user.wallet.transactions.push({
-          amount: transaction.amount,
-          status: 'completed',
+          amount: {
+            cashAmount: -cashAmount,
+            instantBonus: -instantBonus,
+            lockedBonus: 0,
+            gst: -gstAmount,
+            tds: 0,
+            otherDeductions: 0,
+            total: -mainAmount,
+          },
+          status: 'reversed',
           type: 'deposit',
           remark: 'Bank transaction reverted',
         });

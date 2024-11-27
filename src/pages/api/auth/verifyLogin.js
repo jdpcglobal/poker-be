@@ -1,9 +1,10 @@
 import dbConnect from '@/config/dbConnect';
 import Otp from '@/models/otp';
-import User from '@/models/user';
+import User from '@/models/user';  // Updated User model import
 import { signToken } from '@/utils/jwt';
-import { generateGamerName } from '../../../utils/helpers';
+import { generateGamerName } from '@/utils/helpers'; // Helper for generating usernames
 
+// Handler for login with OTP
 export default async function handler(req, res) {
   await dbConnect();
 
@@ -32,7 +33,15 @@ export default async function handler(req, res) {
       createdOn: new Date(),
       completedOn: null,
       status: 'successful',
-      amount: 10,
+      amount: {
+        cashAmount: 0,
+        instantBonus: 10,
+        lockedBonus: 0,
+        gst: 0,
+        tds: 0,
+        otherDeductions: 0,
+        total: 10
+      },
       type: 'bonus',
       remark: 'game join bonus',
       DeskId: null,
@@ -44,7 +53,8 @@ export default async function handler(req, res) {
       username,
       wallet: {
         balance: 0,
-        bonus: 10,
+        instantBonus: 10,
+        lockedBonus: 0,
         transactions: [initialTransaction],
       },
       deviceInfo: req.headers['user-agent'] || 'Unknown device',
@@ -53,6 +63,8 @@ export default async function handler(req, res) {
       latitude: latitude || null,
       longitude: longitude || null,
     });
+
+    // Save new user
     await user.save();
   } else {
     // Check if user status is active

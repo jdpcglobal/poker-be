@@ -68,19 +68,39 @@ export default async function handler(req, res) {
 
     // Fetch paginated bank transactions for the authenticated user
     const bankTransactions = await BankTransaction.find(query)
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    .populate({
+      path: 'bankId', // Populating the bankId reference
+      select: 'accountNumber bankName ifscCode accountHolderName', // Select only these fields
+    })
+    .skip(skip)
+    .limit(limit)
+    .exec();
 
     // Get the total count of bank transactions for pagination info
     const totalBankTransactions = await BankTransaction.countDocuments(query);
 
+    const transactionsWithBankInfo = bankTransactions.map((transaction) => ({
+      createdOn: transaction.createdOn,
+      status: transaction.status,
+      amount: transaction.amount,
+      type: transaction.type,
+      remark: transaction.remark,
+      imageUrl: transaction.imageUrl,
+      bankAccount: transaction.bankId ? {
+        accountNumber: transaction.bankId.accountNumber,
+        bankName: transaction.bankId.bankName,
+        ifscCode: transaction.bankId.ifscCode,
+        accountHolderName: transaction.bankId.accountHolderName,
+      } : null, // Handle case where bankId is not populated
+    }));
+
     return res.status(200).json({
-      bankTransactions,
+      bankTransactions: transactionsWithBankInfo,
       totalPages: Math.ceil(totalBankTransactions / limit),
-      currentPage: page,
+      currentPage: parseInt(page, 10),
       totalBankTransactions,
     });
+    
   } catch (error) {
     console.error('Error fetching bank transactions:', error);
     return res.status(500).json({ message: 'Internal server error' });

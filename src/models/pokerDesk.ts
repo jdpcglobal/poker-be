@@ -212,12 +212,20 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   // Create a wallet transaction for the buy-in
   const transaction: IWalletTransaction = {
     createdOn: new Date(),
-    completedOn: new Date(), // Will be set when the transaction is completed
-    status: 'successful', // Assuming it's successful when deducted
-    amount: buyInAmount,
-    type: 'deskIn', // Type of transaction indicating user sitting in
+    completedOn: new Date(),  // Will be set when completed
+    status: 'successful',  // Assuming it is successful immediately
+    amount: {
+      cashAmount: buyInAmount,
+      instantBonus: 0,
+      lockedBonus: 0,
+      gst: 0,
+      tds: 0,
+      otherDeductions: 0,
+      total: buyInAmount,  // Total is equal to the buy-in amount in this case
+    },
+    type: 'deskIn',  // Transaction type indicating user joined the table
     remark: `User joined the table with seat number ${seatNumber}`,
-    DeskId: this._id, // Reference to this PokerDesk 
+    DeskId: this._id,  // Assuming `this._id` is the current desk's ID
   };
 
   // Add the transaction to the user's wallet

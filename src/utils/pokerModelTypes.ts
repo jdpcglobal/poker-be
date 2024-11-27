@@ -140,22 +140,34 @@ export interface IBankAccount {
   accountHolderName: string;
 }
 
-export interface IWalletTransaction {
-  createdOn: Date;
-  completedOn?: Date;
-  status: 'failed' | 'completed' | 'successful';
-  amount: number;
-  type: 'deposit' | 'withdraw' | 'deskIn' | 'deskWithdraw' | 'bonus';
-  remark?: string;
-  DeskId?: mongoose.Types.ObjectId;
-  BankTransactionId?: mongoose.Types.ObjectId;
+export interface IAmountBreakdown {
+  cashAmount: number;       // Cash portion of the transaction
+  instantBonus: number;     // Instant bonus portion
+  lockedBonus: number;      // Locked bonus portion
+  gst: number;              // GST portion (negative value)
+  tds: number;              // TDS deductions (negative value)
+  otherDeductions: number;  // Other deductions (negative value)
+  total: number;            // Total amount for the transaction
 }
 
+// Interface for individual wallet transactions
+export interface IWalletTransaction {
+  createdOn: Date;                    // Timestamp when transaction was created
+  completedOn?: Date;                 // Optional completion timestamp
+  status: 'failed' | 'completed' | 'successful';  // Status of the transaction
+  amount: IAmountBreakdown;           // Nested breakdown of amounts
+  type: 'deposit' | 'withdraw' | 'deskIn' | 'deskWithdraw' | 'bonus';  // Type of transaction
+  remark?: string;                    // Optional remark for the transaction
+  DeskId?: mongoose.Types.ObjectId;                  // Reference to PokerDesk (if applicable)
+  BankTransactionId?: mongoose.Types.ObjectId;       // Reference to BankTransaction (if applicable)
+}
+
+// Interface for the wallet containing balances and transactions
 export interface IWallet {
-  balance: number;
-  bonus: number;
-  coins: number;
-  transactions: IWalletTransaction[];
+  balance: number;        // Wallet cash balance
+  instantBonus: number;   // Instant bonus balance
+  lockedBonus: number;    // Locked bonus balance
+  transactions: IWalletTransaction[]; // Array of wallet transactions
 }
 
 export interface IUser extends Document {
@@ -173,4 +185,4 @@ export interface IUser extends Document {
   latitude?: number;        // Optional latitude for location
   longitude?: number;       // Optional longitude for location
   updateLastLogin(req: Request): Promise<void>;
-}
+} 
