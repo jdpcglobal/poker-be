@@ -25,7 +25,7 @@ const BankTransactions = () => {
       
       try {
          // Replace 'token' with your actual cookie name
-        const response = await axios.get('http://localhost:3000/api/admin/auth/getBankTransactions', {
+        const response = await axios.get('/api/admin/auth/getBankTransactions', {
           params: { page, limit: itemsPerPage }, 
         });
         setTransactions(response.data.transactions);

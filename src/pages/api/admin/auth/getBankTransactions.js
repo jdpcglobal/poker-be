@@ -4,10 +4,8 @@ import BankTransaction from '../../../../models/bankTransaction';
 import User from '../../../../models/user';
 import BankAccount from '../../../../models/bankAccount';
 import mongoose from 'mongoose';
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '../../../../utils/jwt';
 import cookie from 'cookie';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 export default async function handler(req, res) {
   await dbConnect();
@@ -30,21 +28,11 @@ export default async function handler(req, res) {
 
   try {
     // Verify JWT token
+    const payload = verifyToken(token);
+    if (!payload.userId || !payload.role || payload.role !== 'superadmin' ) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
     
-
-    const payload = jwt.verify(token, JWT_SECRET);
-
-    if (!payload) {
-      return res.status(403).json({ message: 'token not found' });
-    } 
-    if (!payload.userId || !payload.role ) {
-      return res.status(403).json({ message: 'token is expired' });
-    }
-   
-    if (payload.role !== 'superadmin') {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
     const pageNumber = parseInt(page);
     const pageLimit = parseInt(limit);
 
