@@ -49,8 +49,12 @@ export default async function handler(req, res) {
     const mainAmount = transaction.amount;
 
     // Calculate breakdown
-    const cashAmount = mainAmount / 1.28;
-    const gstAmount = mainAmount - cashAmount;
+    // Calculate breakdown
+
+    const cashAmount = Math.round((mainAmount / 1.28) * 100) / 100; // Round to two decimal places
+
+    const gstAmount = Math.round((mainAmount - cashAmount) * 100) / 100; // Round to two decimal places
+
     const instantBonus = gstAmount; // Instant bonus equals GST
 
     if (transaction.type === 'deposit') {
