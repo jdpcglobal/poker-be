@@ -70,7 +70,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     transaction.orderId = data.id;
-    transaction.status = 'pending';
+    transaction.status = 'created';
     await transaction.save();
 
     return res.status(201).json({
