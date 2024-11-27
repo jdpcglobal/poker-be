@@ -4,15 +4,21 @@ import BankTransaction from '../../../../models/bankTransaction';
 import User from '../../../../models/user';
 import BankAccount from '../../../../models/bankAccount';
 import mongoose from 'mongoose';
-import { verifyToken } from '../../../../utils/jwt';
+import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 export default async function handler(req, res) {
   await dbConnect();
 
   const { page = 1, limit = 10, userId, bankId } = req.body;
-  const cookies = cookie.parse(req.headers.cookie || '');
-  const token = cookies.token;
+  
+  const { token } = cookie.parse(req.headers.cookie || '');
+ 
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
   // Extract cookies from the request headers using the 'cookie' package
  // const token = req.cookies.get('token')?.value
   console.log("token", token);
@@ -24,9 +30,19 @@ export default async function handler(req, res) {
 
   try {
     // Verify JWT token
-    const payload = await verifyToken(token);
+    
+
+    const payload = jwt.verify(token, JWT_SECRET);
+
+    if (!payload) {
+      return res.status(403).json({ message: 'token not found' });
+    } 
     if (!payload.userId || !payload.role ) {
-      return res.status(403).json({ message: 'Unauthorized access' });
+      return res.status(403).json({ message: 'token is expired' });
+    }
+   
+    if (payload.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const pageNumber = parseInt(page);
