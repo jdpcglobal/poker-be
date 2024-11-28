@@ -71,7 +71,7 @@ export default async function handler(req, res) {
 
     // Update the wallet
     user.wallet.balance += cashAmount;
-    user.wallet.balance += instantBonus;
+    user.wallet.instantBonus += instantBonus;
 
     // Add a wallet transaction
     user.wallet.transactions.push({
