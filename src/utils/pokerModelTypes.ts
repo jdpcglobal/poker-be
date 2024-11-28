@@ -159,7 +159,8 @@ export interface IWalletTransaction {
   type: 'deposit' | 'withdraw' | 'deskIn' | 'deskWithdraw' | 'bonus';  // Type of transaction
   remark?: string;                    // Optional remark for the transaction
   DeskId?: mongoose.Types.ObjectId;                  // Reference to PokerDesk (if applicable)
-  BankTransactionId?: mongoose.Types.ObjectId;       // Reference to BankTransaction (if applicable)
+  BankTransactionId?: mongoose.Types.ObjectId;  
+  pmgtId?: mongoose.Types.ObjectId;   // Reference to BankTransaction (if applicable)
 }
 
 // Interface for the wallet containing balances and transactions

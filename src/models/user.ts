@@ -20,12 +20,13 @@ const WalletTransactionSchema: Schema<IWalletTransaction> = new Schema({
   amount: { type: AmountBreakdownSchema, required: true }, // Nested breakdown for amounts
   type: {
     type: String,
-    enum: ['deposit', 'withdraw', 'deskIn', 'deskWithdraw', 'bonus'],
+    enum: ['deposit', 'withdraw', 'deskIn', 'deskWithdraw', 'bonus', 'pgDeposit'],
     required: true,
   },
   remark: { type: String },
   DeskId: { type: mongoose.Schema.Types.ObjectId, ref: 'PokerDesk' },
   BankTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'BankTransaction' },
+  pmgtId : { type: mongoose.Schema.Types.ObjectId, ref: 'PmgTransaction' },
 });
 
 const WalletSchema: Schema<IWallet> = new Schema({

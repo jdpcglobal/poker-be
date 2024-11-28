@@ -8,7 +8,8 @@ export interface IPMGTransaction extends Document {
   amount: number; // Transaction amount
   currency: string; // Transaction currency, default is INR
   notes: Record<string, any>; // Additional notes
-   
+  razPayId?: string;
+  razSignature?:string;
   createdAt: Date; // Timestamp when the transaction was created
   updatedAt: Date; // Timestamp when the transaction was updated
 }
@@ -18,6 +19,8 @@ const PMGTransactionSchema = new Schema<IPMGTransaction>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     orderId: { type: String, default: null },
+    razPayId: { type: String, default: null },
+    razSignature: { type: String, default: null },
     status: {
       type: String,
       enum: ['created', 'successful', 'failed', 'pending'],
