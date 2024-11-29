@@ -281,7 +281,7 @@ export default function handler(req, res) {
     const io = new Server(res.socket.server, {
       path: "/api/socket",
       cors: {
-        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app","https://delightful-coast-006df5400.5.azurestaticapps.net"], // Allowed origins
+        origin: ["http://localhost:8081","http://localhost:3000", "http://192.168.1.23:3000", "https://poker-be.netlify.app","https://delightful-coast-006df5400.5.azurestaticapps.net"], // Allowed origins
       },
     });
     
