@@ -252,6 +252,7 @@ const sendPlayerActionResult = async (io, tableId, actionResult) => {
 const checkReconnection = async (tableId, userId) => {
   
   const pokerTable = await PokerDesk.findById(tableId);
+
   const isAlreadySeated = await pokerTable.isUserSeated(userId);
   if (isAlreadySeated) {
     await pokerTable.updateSeatStatus(userId,"active");
@@ -262,18 +263,27 @@ const checkReconnection = async (tableId, userId) => {
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log("Initializing new Socket.io server...");
-    const io = new Server(res.socket.server, {
-      path: "/api/socket",
-      cors: {
-        origin: "*", // Allowed origins
-      },
-    });
+    
     // const io = new Server(res.socket.server, {
     //   path: "/api/socket",
     //   cors: {
-    //     origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app"], // Allowed origins
+    //     origin: "*", // Allowed origins
     //   },
     // });
+
+    // const io = new Server(res.socket.server, {
+    //   cors: {
+    //     path: "/api/socket",
+    //     origin: ["http://localhost:8081"],
+    //   }
+    // });
+
+    const io = new Server(res.socket.server, {
+      path: "/api/socket",
+      cors: {
+        origin: ["http://localhost:8081", "http://192.168.54.75:3000", "https://poker-be.netlify.app","https://delightful-coast-006df5400.5.azurestaticapps.net"], // Allowed origins
+      },
+    });
     
     // const io = new Server(res.socket.server, {
     //   path: "/api/socket",
