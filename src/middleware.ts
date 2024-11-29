@@ -10,6 +10,7 @@ export const config = {
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  const res = NextResponse.next();
   const isPrivatePath = path.startsWith('/admin'); // Path that requires authentication
  
 
@@ -59,8 +60,7 @@ export async function middleware(req: NextRequest) {
     }
   }
  }
- else if(path === '/api/socket'){
-  const res = NextResponse.next();
+ else if(path === '/api/socket'){ 
   const origin = req.headers.get('origin');
   console.log("CORS middleware triggered for /api/socket");
 
@@ -71,15 +71,10 @@ export async function middleware(req: NextRequest) {
   res.headers.append('Access-Control-Allow-Credentials', 'true'); // Allow credentials
 
   // Handle OPTIONS preflight requests
-  if (req.method === 'OPTIONS') {
-    return res; // Respond with CORS headers for preflight requests
-  }
-
+  
   return res;
   
- } else{
-
- }
+ }  
   // Allow request to proceed if no conditions above matched
   return NextResponse.next();
 }
