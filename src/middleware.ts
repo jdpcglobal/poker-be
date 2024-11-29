@@ -5,16 +5,20 @@ import { jwtVerify } from 'jose';
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export const config = {
-  matcher: ['/admin/:path*', '/auth/login'],
+  matcher: ['/admin/:path*', '/auth/login', '/api/socket'],
 };
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isPrivatePath = path.startsWith('/admin'); // Path that requires authentication
+ 
+
+  // Check if token is present
+ if(isPrivatePath || path === '/auth/login' ){ 
+
   console.log("isPrivatePath",isPrivatePath);
   const token = req.cookies.get('token')?.value || '';
   console.log('Middleware path:', req.nextUrl.pathname);
-  // Check if token is present
   if (token) {
     try {
       // Verify the token
@@ -46,14 +50,36 @@ export async function middleware(req: NextRequest) {
         return NextResponse.redirect(new URL('/auth/login', req.url));
       }
     }
-  } else {
+  }
+   else {
     // If no token is found, redirect to login for private paths
     if (isPrivatePath && path !== '/auth/login') {
       console.log('No token found, redirecting to login...');
       return NextResponse.redirect(new URL('/auth/login', req.url));
     }
   }
+ }
+ else if(path === '/api/socket'){
+  const res = NextResponse.next();
+  const origin = req.headers.get('origin');
+  console.log("CORS middleware triggered for /api/socket");
 
+  // Allow CORS for all origins
+  res.headers.append('Access-Control-Allow-Origin', '*');
+  res.headers.append('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.headers.append('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.headers.append('Access-Control-Allow-Credentials', 'true'); // Allow credentials
+
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res; // Respond with CORS headers for preflight requests
+  }
+
+  return res;
+  
+ } else{
+
+ }
   // Allow request to proceed if no conditions above matched
   return NextResponse.next();
 }

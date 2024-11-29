@@ -35,7 +35,8 @@ export default async function handler(req, res) {
           stake: pokerMode.stake,
           minBuyIn: pokerMode.minBuyIn,
           maxBuyIn: pokerMode.maxBuyIn,
-          maxPlayerCount: pokerMode.maxPlayerCount,
+          bType : pokerMode.bType,
+          minPlayerCount: pokerMode.maxPlayerCount,
           blindsOrAntes: pokerMode.blindsOrAntes,
           status: pokerMode.status,
         };

@@ -8,7 +8,7 @@ interface Poker {
   communityCardsCount: number;
   maxHoleCards: number;
   numberOfRounds: number;
-  blindsOrAntes: 'Blinds' | 'Antes';
+  bType: 'Blinds' | 'Antes' | 'both';
   objective: string;
   status: 'active' | 'maintenance' | 'disable';
 }
@@ -20,7 +20,7 @@ const PokerAdmin: React.FC = () => {
     communityCardsCount: 0,
     maxHoleCards: 2,
     numberOfRounds: 0,
-    blindsOrAntes: 'Blinds',
+    bType: 'Blinds',
     objective: '',
     status: 'active',
   });
@@ -52,7 +52,7 @@ const PokerAdmin: React.FC = () => {
         communityCardsCount: 0,
         maxHoleCards: 2,
         numberOfRounds: 0,
-        blindsOrAntes: 'Blinds',
+        bType: 'Blinds',
         objective: '',
         status: 'active',
       });
@@ -66,7 +66,7 @@ const PokerAdmin: React.FC = () => {
       communityCardsCount: poker.communityCardsCount,
       maxHoleCards: poker.maxHoleCards,
       numberOfRounds: poker.numberOfRounds,
-      blindsOrAntes: poker.blindsOrAntes,
+      bType: poker.bType,
       objective: poker.objective,
       status: poker.status,
     });
@@ -172,7 +172,7 @@ const PokerAdmin: React.FC = () => {
                 <label className="block text-sm font-medium">Blinds or Antes:</label>
                 <select
                   name="blindsOrAntes"
-                  value={newPoker.blindsOrAntes}
+                  value={newPoker.bType}
                   onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring focus:ring-blue-500 focus:border-blue-500"
                 >
@@ -247,7 +247,7 @@ const PokerAdmin: React.FC = () => {
                   <td className="py-2 px-4 border-b">{poker.communityCardsCount}</td>
                   <td className="py-2 px-4 border-b">{poker.maxHoleCards}</td>
                   <td className="py-2 px-4 border-b">{poker.numberOfRounds}</td>
-                  <td className="py-2 px-4 border-b">{poker.blindsOrAntes}</td>
+                  <td className="py-2 px-4 border-b">{poker.bType}</td>
                   <td className="py-2 px-4 border-b">{poker.objective}</td>
                   <td className="py-2 px-4 border-b">{poker.status}</td>
                   <td className="py-2 px-4 border-b">
@@ -329,7 +329,7 @@ const PokerAdmin: React.FC = () => {
                 <label className="block text-sm font-medium">Blinds or Antes:</label>
                 <select
                   name="blindsOrAntes"
-                  value={editingPoker.blindsOrAntes || 'Blinds'}
+                  value={editingPoker.bType || 'Blinds'}
                   onChange={handleEditChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring focus:ring-blue-500 focus:border-blue-500"
                 >

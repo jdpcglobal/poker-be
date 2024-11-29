@@ -40,7 +40,7 @@ const BankTransactions = () => {
 
   const changeTransactionStatus = async (transactionId: string, newStatus: 'failed' | 'completed' | 'successful' | 'waiting') => {
     try {
-      await axios.put('http://localhost:3000/api/admin/auth/updateTransactionStatus', {
+      await axios.put('/api/admin/auth/updateTransactionStatus', {
         transactionId,
         newStatus,
       });

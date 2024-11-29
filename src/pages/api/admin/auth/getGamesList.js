@@ -73,7 +73,7 @@ export default async function handler(req, res) {
 
         // Define sorting options
         const sortOptions = sortBy === 'potAmount'
-            ? { pot: sortOrder === 'asc' ? 1 : -1 }
+            ? { totalBet: sortOrder === 'asc' ? 1 : -1 }
             : { createdAt: sortOrder === 'asc' ? 1 : -1 };
 
         // Pagination options
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
                     amount: winner.amount
                 }))
             })),
-            totalBet : archive.pot,
+            totalBet : archive.totalBet,
             createdAt: archive.createdAt
         }));
        

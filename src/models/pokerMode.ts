@@ -6,9 +6,8 @@ interface IPokerMode extends Document {
   pokerId: mongoose.Schema.Types.ObjectId;
   stake?: number; // Single field for either smallBlind, bigBlind, or anteAmount
   minBuyIn: number;
-  maxBuyIn: number;
-  maxPlayerCount: number;
-  blindsOrAntes: 'blinds' | 'antes'; // To differentiate
+  maxBuyIn: number; 
+  bType: 'blinds' | 'antes' | 'both' ; // To differentiate
   status: 'active' | 'disable'; // Field for status
   description?: string;
   createdAt: Date;
@@ -24,7 +23,7 @@ const pokerModeSchema = new Schema<IPokerMode>({
   },
   stake: {
     type: Number,
-    required: function() { return this.blindsOrAntes === 'blinds' || this.blindsOrAntes === 'antes'; }, // Required for both Blinds and Antes
+    required: function() { return this.bType === 'blinds' || this.bType === 'antes' || this.bType === 'both'; }, // Required for both Blinds and Antes
   },
   minBuyIn: {
     type: Number,
@@ -34,11 +33,8 @@ const pokerModeSchema = new Schema<IPokerMode>({
     type: Number,
     required: true,
   },
-  maxPlayerCount: {
-    type: Number,
-    required: true,
-  },
-  blindsOrAntes: {
+  
+  bType : {
     type: String,
     enum: ['blinds', 'antes'],
     required: true,

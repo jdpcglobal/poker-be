@@ -73,7 +73,7 @@ const PotSchema = new Schema({
 const PokerGameSchema = new Schema<IPokerGame>({
   players: [PlayerSchema],
   currentTurnPlayer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-  pot: { type: Number, default: 0 },
+  totalBet: { type: Number, default: 0 },
   status: { type: String, enum: ['waiting', 'in-progress', 'finished'], default: 'waiting' },
   rounds: [RoundSchema],
   communityCards: [{
@@ -111,13 +111,14 @@ const PokerDeskSchema = new Schema<IPokerTable>({
     type: Number,
     required: true,
   },
-  maxPlayerCount: {
+  minPlayerCount: {
     type: Number,
+    default:2,
     required: true,
   },
-  blindsOrAntes: {
+  bType: {
     type: String,
-    enum: ['blinds', 'antes'],
+    enum: ['blinds', 'antes','both'],
     required: true,
   },
   status: {
@@ -231,9 +232,17 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   // Add the transaction to the user's wallet
   user.wallet.transactions.push(transaction);
 
+
   // Save the updated user and PokerDesk instances
   try {
     await user.save(); // Save user with updated balance and transaction
+    const activePlayersCount = this.seats.filter((seat: ISeat) => seat.status === 'active').length;
+
+    if (activePlayersCount >= this.minPlayerCount && this.currentGameStatus === 'finished') {
+      console.log('Min player count reached and game finished. Creating a new game...');
+      await this.createGameFromTable();
+    }
+
     await this.save(); // Save PokerDesk with the new seat
     return newSeat; // Return the newly created seat
   } catch (error: any) {
@@ -283,14 +292,23 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
 
   // Create a wallet transaction for the balance being returned to the user
   const transaction: IWalletTransaction = {
-    createdOn: new Date(),
-    completedOn: new Date(), // Will be set when the transaction is completed
-    status: 'successful', // Assuming the return is successful
-    amount: amountToAdd,
-    type: 'deskWithdraw', // Type of transaction indicating user leaving the table
-    remark: `User left the table and withdrew ${amountToAdd}`,
-    DeskId: this._id, // Reference to this PokerDesk
+    createdOn: new Date(),                 // Current timestamp for creation
+    completedOn: new Date(),               // Timestamp when the transaction is completed
+    status: 'successful',                  // Status of the transaction
+    amount: {                              // Updated amount structure
+      cashAmount: amountToAdd,             // Cash portion of the transaction
+      instantBonus: 0,                     // No instant bonus applied here
+      lockedBonus: 0,                      // No locked bonus applied here
+      gst: 0,                              // Assuming no GST for this transaction
+      tds: 0,                              // Assuming no TDS deductions
+      otherDeductions: 0,                  // Assuming no other deductions
+      total: amountToAdd,                  // Total amount matches cashAmount
+    },
+    type: 'deskWithdraw',                  // Type indicating user leaving the table
+    remark: `User left the table and withdrew ${amountToAdd}`, // Remark for clarity
+    DeskId: this._id,                      // Reference to this PokerDesk
   };
+  
 
   // Update the user's wallet balance
   user.wallet.balance += amountToAdd;
@@ -431,7 +449,7 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerG
   const newGame : RPokerGame  = {
     players: activePlayers,
     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,
-    pot: initialPotAmount,
+    totalBet: initialPotAmount,
     pots: null,
     status: 'in-progress',
     rounds: [{
@@ -826,7 +844,7 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     player.balanceAtTable -= finalAmount;
     playerSeat.totalBet += finalAmount;
     playerSeat.balanceAtTable -= finalAmount;
-    this.currentGame.pot += finalAmount;
+    this.currentGame.totalBet += finalAmount;
     newAction.amount = finalAmount;
 
   } else {

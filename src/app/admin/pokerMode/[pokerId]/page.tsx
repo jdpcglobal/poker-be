@@ -9,8 +9,8 @@ interface PokerMode {
   stake?: number;
   minBuyIn: number;
   maxBuyIn: number;
-  maxPlayerCount: number;
-  blindsOrAntes: 'blinds' | 'antes';
+  minPlayerCount: number;
+  bType: 'blinds' | 'antes' | 'both';
   status: 'active' | 'disable';
   description?: string;
   createdAt: Date;
@@ -27,8 +27,8 @@ const PokerModeAdmin: React.FC = () => {
     stake: 0,
     minBuyIn: 0,
     maxBuyIn: 0,
-    maxPlayerCount: 0,
-    blindsOrAntes: 'blinds',
+    minPlayerCount: 0,
+    bType: 'blinds',
     status: 'active',
     description: ''
   });
@@ -82,8 +82,8 @@ const PokerModeAdmin: React.FC = () => {
         stake: 0,
         minBuyIn: 0,
         maxBuyIn: 0,
-        maxPlayerCount: 0,
-        blindsOrAntes: 'blinds',
+        minPlayerCount: 0,
+        bType: 'blinds',
         status: 'active',
         description: ''
       });
@@ -219,8 +219,8 @@ const PokerModeAdmin: React.FC = () => {
           <p className="text-gray-600 mt-2">Stake: {pokerMode.stake}</p>
           <p className="text-gray-600">Min Buy-In: {pokerMode.minBuyIn}</p>
           <p className="text-gray-600">Max Buy-In: {pokerMode.maxBuyIn}</p>
-          <p className="text-gray-600">Max Player Count: {pokerMode.maxPlayerCount}</p>
-          <p className="text-gray-600">Blinds/Antes: {pokerMode.blindsOrAntes}</p>
+          <p className="text-gray-600">Max Player Count: {pokerMode.minPlayerCount}</p>
+          <p className="text-gray-600">Blinds/Antes: {pokerMode.bType}</p>
           <p className={`text-sm mt-3 ${pokerMode.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
             Status: {pokerMode.status}
           </p>
@@ -300,7 +300,7 @@ const PokerModeAdmin: React.FC = () => {
                   id="maxPlayerCount"
                   name="maxPlayerCount"
                   type="number"
-                  value={editingPokerModeId ? editingPokerMode.maxPlayerCount : newPokerMode.maxPlayerCount}
+                  value={editingPokerModeId ? editingPokerMode.minPlayerCount : newPokerMode.minPlayerCount}
                   onChange={editingPokerModeId ? handleEditChange : handleChange}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   required
@@ -311,7 +311,7 @@ const PokerModeAdmin: React.FC = () => {
                 <select
                   id="blindsOrAntes"
                   name="blindsOrAntes"
-                  value={editingPokerModeId ? editingPokerMode.blindsOrAntes : newPokerMode.blindsOrAntes}
+                  value={editingPokerModeId ? editingPokerMode.bType : newPokerMode.bType}
                   onChange={editingPokerModeId ? handleEditChange : handleChange}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   required

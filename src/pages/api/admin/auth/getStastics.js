@@ -65,11 +65,11 @@ const getStatistics = async () => {
   const totalFinishedPokerGames = await PokerGameArchive.countDocuments({ status: 'finished' });
   const totalPotInActiveGames = await PokerGameArchive.aggregate([
     { $match: { status: 'in-progress' } },
-    { $group: { _id: null, totalPot: { $sum: '$pot' } } }
+    { $group: { _id: null, totalPot: { $sum: '$totalBet' } } }
   ]);
   const totalPotInFinishedGames = await PokerGameArchive.aggregate([
     { $match: { status: 'finished' } },
-    { $group: { _id: null, totalPot: { $sum: '$pot' } } }
+    { $group: { _id: null, totalPot: { $sum: '$totalBet' } } }
   ]);
   const mostPlayedPokerDesk = await PokerGameArchive.aggregate([
     { $group: { _id: '$deskId', count: { $sum: 1 } } },

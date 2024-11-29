@@ -30,7 +30,7 @@ export interface IPot {
 export interface RPokerGame {
   players: IPlayer[];  // List of active players in the game
   currentTurnPlayer: string;  // User ID of the player whose turn it is
-  pot: number;  // Total amount in the main pot
+  totalBet: number;  // Total amount in the main pot
   pots: IPot[] | null;  // Array of pots if there are side pots, else null
   status: 'in-progress' | 'finished';  // Current status of the game
   rounds: IRound[];  // Array of betting rounds
@@ -84,17 +84,14 @@ export interface ISidePot {
 export interface IPokerGame {
   players: IPlayer[];
   currentTurnPlayer: mongoose.Types.ObjectId | null;
-  pot: number;
+  totalBet: number;
   status: 'waiting' | 'in-progress' | 'finished';
   rounds: IRound[];
   communityCards: ICard[];
   pots: IPot[] | null; // Updated field
   createdAt: Date;
   updatedAt: Date;
-  // minBuyIn : Number;
-  // maxBuyIn : Number;
-  
-  // PokerGame methods transferred to PokerDesk
+   
   createGameFromTable(pokerDeskId: mongoose.Types.ObjectId): Promise<void>;
   dealCards(count: number, cardType?: 'hole' | 'community'): ICard[];
   getNextActivePlayer(currentUserId: mongoose.Types.ObjectId): mongoose.Types.ObjectId | null;
@@ -121,8 +118,8 @@ export interface IPokerTable extends mongoose.Document {
   stake: number; // Single field for either smallBlind, bigBlind, or anteAmount
   minBuyIn: number;
   maxBuyIn: number;
-  maxPlayerCount: number;
-  blindsOrAntes: 'blinds' | 'antes'; // To differentiate
+  minPlayerCount: number;
+  bType: 'blinds' | 'antes' | 'both'; // To differentiate
   status: 'active' | 'disable'; 
   // PokerDesk methods
   addUserToSeat(userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat>;
