@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import PokerDesk from "../../models/pokerDesk";
 import User from "../../models/user"; // Adjust path if needed
+import dbConnect from "../../config/dbConnect";
 const socketRegistry = {};
 
 // Add a socket to the registry
@@ -263,7 +264,7 @@ const checkReconnection = async (tableId, userId) => {
 export default function handler(req, res) {
   if (!res.socket.server.io) {
     console.log("Initializing new Socket.io server...");
-    
+    dbConnect();
     // const io = new Server(res.socket.server, {
     //   path: "/api/socket",
     //   cors: {
