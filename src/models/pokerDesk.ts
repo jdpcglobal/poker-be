@@ -238,7 +238,7 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     await user.save(); // Save user with updated balance and transaction
     const activePlayersCount = this.seats.filter((seat: ISeat) => seat.status === 'active').length;
 
-    if (activePlayersCount >= this.minPlayerCount && this.currentGameStatus === 'finished') {
+    if (activePlayersCount >= this.minPlayerCount && !this.currentGame || this.currentGame.status !== 'in-progress') {
       console.log('Min player count reached and game finished. Creating a new game...');
       await this.createGameFromTable();
     }
@@ -333,7 +333,7 @@ PokerDeskSchema.methods.updateSeatStatus = async function (
 ): Promise<void> {
   try {
     // Check if there is an ongoing game on this table
-    const isGameActive = this.currentGame && this.currentGame.status === 'playing';
+    const isGameActive = this.currentGame && this.currentGame.status === 'in-progress';
 
     if (status === 'disconnected') {
       if (isGameActive) {

@@ -283,6 +283,8 @@ export default function handler(req, res) {
       path: "/api/socket",
       cors: {
         origin: "*", // Allowed origins
+        methods: ["GET", "POST"],
+        credentials: true,
      },
     });
     
