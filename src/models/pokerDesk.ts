@@ -237,8 +237,11 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   try {
     await user.save(); // Save user with updated balance and transaction
     const activePlayersCount = this.seats.filter((seat: ISeat) => seat.status === 'active').length;
-
-    if (activePlayersCount >= this.minPlayerCount && !this.currentGame || this.currentGame.status !== 'in-progress') {
+     const isTrue = activePlayersCount >= this.minPlayerCount && this.currentGame?.status !== 'in-progress';
+     console.log("fasdfasdfasdfsadf", activePlayersCount >= this.minPlayerCount );
+     console.log("we are here we are there mai hoo na", this.currentGame !== null);
+     console.log("mai hoo na",this.currentGame?.status !== 'in-progress');
+    if (activePlayersCount >= this.minPlayerCount && this.currentGame !== null && this.currentGame?.status !== 'in-progress') {
       console.log('Min player count reached and game finished. Creating a new game...');
       await this.createGameFromTable();
     }

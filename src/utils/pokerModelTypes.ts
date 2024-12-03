@@ -13,7 +13,6 @@ export interface ISeat {
 export interface IPlayerBets {
   [userId: string]: number;
 }
-
  
 export interface IPot {
   amount: number; // The total amount in the pot

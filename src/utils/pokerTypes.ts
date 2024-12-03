@@ -30,7 +30,7 @@ export interface ICard {
   export interface IPlayer {
     userId: string; // Assuming string type for player ID, adjust as needed
     holeCards: ICard[];
-    status: 'active' | 'folded'; // Player status to determine eligibility
+    status: 'active' | 'folded' | 'all-in'; // Player status to determine eligibility
   }
   
   export interface IPlayerHand {

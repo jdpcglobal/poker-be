@@ -44,7 +44,7 @@ export default async function handler(req, res) {
                 $group: {
                     _id: null,
                     totalGames: { $sum: 1 },
-                    totalBet: { $sum: "$pot" }
+                    totalBet: { $sum: "$totalBet" }
                 }
             }
         ];
