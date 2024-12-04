@@ -241,10 +241,11 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
      console.log("fasdfasdfasdfsadf", activePlayersCount >= this.minPlayerCount );
      console.log("we are here we are there mai hoo na", this.currentGame !== null);
      console.log("mai hoo na",this.currentGame?.status !== 'in-progress');
-    if (activePlayersCount >= this.minPlayerCount && this.currentGame !== null && this.currentGame?.status !== 'in-progress') {
-      console.log('Min player count reached and game finished. Creating a new game...');
-      await this.createGameFromTable();
-    }
+     
+    // if (activePlayersCount >= this.minPlayerCount && this.currentGame !== null && this.currentGame?.status !== 'in-progress') {
+    //   console.log('Min player count reached and game finished. Creating a new game...');
+    //   await this.createGameFromTable();
+    // }
 
     await this.save(); // Save PokerDesk with the new seat
     return newSeat; // Return the newly created seat

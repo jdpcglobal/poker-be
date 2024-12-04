@@ -6,8 +6,8 @@ import mongoose from 'mongoose';
 export default async function handler(req, res) {
   // Ensure the database is connected
   await dbConnect();
-  
-  // Only allow GET method
+
+  // Only allow POST method
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
@@ -37,7 +37,10 @@ export default async function handler(req, res) {
     }
 
     // Fetch poker desks for the given pokerModeId
-    const pokerDesks = await PokerDesk.find({ pokerModeId }).exec();
+    const pokerDesks = await PokerDesk.find({ pokerModeId })
+    .populate('seats.userId', 'username') // Populate the userId in seats with username
+    .exec();
+
     if (pokerDesks.length === 0) {
       return res.status(404).json({ message: 'No poker desks available for the specified poker mode' });
     }
@@ -54,9 +57,32 @@ export default async function handler(req, res) {
 
     const bestDesk = sortedDesks[0] || pokerDesks[0];
 
-    // Return a valid response with the best desk found
+    const formattedSeats = bestDesk.seats
+    .map((seat) => {
+      if (seat.userId) {
+        return {
+          userId: seat.userId._id.toString(),
+          username: seat.userId.username,
+          seatNumber: seat.seatNumber,
+          buyInAmount: seat.buyInAmount,
+          balanceAtTable: seat.balanceAtTable,
+          status: seat.status || 'active',
+        };
+      } else {
+        return null;
+      }
+    })
+    .filter((seat) => seat !== null);
+
+    // Return a valid response with additional information
     return res.status(200).json({
-      tableId: bestDesk._id,
+      id: bestDesk._id,
+      seats: formattedSeats,
+      pokerModeId: bestDesk.pokerModeId,
+      tableName: bestDesk.tableName,
+      maxSeats: bestDesk.maxSeats,
+      minBuyIn: bestDesk.minBuyIn,
+      maxBuyIn: bestDesk.maxBuyIn,
       message: 'Best table found',
     });
 

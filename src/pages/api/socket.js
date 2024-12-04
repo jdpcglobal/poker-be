@@ -6,7 +6,7 @@ import dbConnect from "../../config/dbConnect";
 const socketRegistry = {};
 
 // Add a socket to the registry
-const addSocket = async (userId, tableId, socketId) => {
+const addSocket = async (userId, tableId, socketId,io) => {
   if (!userId || !tableId) throw new Error("User ID and Table ID are required to add socket");
   console.log("socket registry 66666",socketRegistry);
   if (!socketRegistry[tableId]) socketRegistry[tableId] = {}; // Ensure table entry exists
@@ -15,14 +15,15 @@ const addSocket = async (userId, tableId, socketId) => {
   if (!socketRegistry[tableId][userId].includes(socketId)) {
     socketRegistry[tableId][userId].push(socketId);
     console.log(`Socket ${socketId} added for user ${userId} at table ${tableId}`);
-    await checkReconnection(tableId,userId);
+    await checkReconnection(tableId,userId,io);
     console.log("socket registry 23456",socketRegistry);
   }
   console.log("socket registry",socketRegistry);
+   
 };
 
 // updateSeatStatus function
-const updateSeatStatus = async (userId, tableId, status) => {
+const updateSeatStatus = async (userId, tableId, status,io) => {
   try {
     // Find the desk by tableId
     const desk = await PokerDesk.findById(tableId);
@@ -36,12 +37,13 @@ const updateSeatStatus = async (userId, tableId, status) => {
     await desk.updateSeatStatus(userId, status); // Assuming desk.updateStatus is a defined method
 
     console.log(`User ${userId} status updated to ${status} at table ${tableId}`);
+
+    await  sendSeatData(io,tableId);
   } catch (error) {
     console.error(`Failed to update seat status for user ${userId} at table ${tableId}: ${error.message}`);
   }
 };
-
-
+ 
 // Remove a socket from the registry
 // const removeSocket = (socketId) => {
 //   for (const userId in socketRegistry) {
@@ -56,7 +58,7 @@ const updateSeatStatus = async (userId, tableId, status) => {
 //   console.log(`Socket ${socketId} removed from registry`);
 // };
  
-const removeSocket = (socketId) => {
+const removeSocket = (socketId,io) => {
   for (const tableId in socketRegistry) {
     for (const userId in socketRegistry[tableId]) {
       const socketList = socketRegistry[tableId][userId];
@@ -67,9 +69,10 @@ const removeSocket = (socketId) => {
 
         // If no more sockets exist for this user at this table, update status
         if (socketList.length === 0) {
-          updateSeatStatus(userId, tableId, 'disconnected'); // Call your status update function
+          updateSeatStatus(userId, tableId, 'disconnected',io); // Call your status update function
           delete socketRegistry[tableId][userId];
           console.log(`All sockets removed for user ${userId} at table ${tableId}`);
+          
         }
 
         // If no more users on this table, remove the table from the registry
@@ -85,10 +88,10 @@ const removeSocket = (socketId) => {
 };
 
 const sendSeatData = async (io, tableId) => {
-  try {
-    const pokerTable = await PokerDesk.findById(tableId)
-      .populate("seats.userId", "username");
+  const pokerTable = await PokerDesk.findById(tableId)
+  .populate("seats.userId", "username");
 
+  try {  
     if (!pokerTable) throw new Error("Poker table not found");
 
     const formattedSeats = pokerTable.seats
@@ -108,10 +111,29 @@ const sendSeatData = async (io, tableId) => {
       })
       .filter((seat) => seat !== null);
 
+
     io.to(`table-${tableId}`).emit("seatData", formattedSeats);
     console.log(`Seat data for table ${tableId} sent`);
+
   } catch (error) {
     console.error(`Error sending seat data: ${error.message}`);
+  }
+
+  if (
+    !pokerTable.currentGame ||
+    pokerTable.currentGame.status !== 'in-progress'
+  ) {
+    if (pokerTable.seats.length <= pokerTable.minPlayerCount) {
+      console.log(`Creating new game for table ${tableId}`);
+     
+      try {
+        await pokerTable.createGameFromTable(tableId); // Call your createGameForTable function
+        await sendGame(io, tableId)
+      } catch (error) {
+        console.log(error);
+      }
+        // Update currentGame
+    }
   }
 };
 
@@ -153,6 +175,20 @@ const sendGameData = async (io, tableId) => {
   }
 };
 
+const sendGame = async (io, tableId) => {
+  try {
+    const pokerTable = await PokerDesk.findById(tableId);
+
+    if (!pokerTable || !pokerTable.currentGame) throw new Error("No active game for this table");
+
+    const pokerGame = pokerTable.currentGame;
+    
+    io.to(`table-${tableId}`).emit("wGameData", pokerGame);
+    console.log(`Game data for table ${tableId} sent`);
+  } catch (error) {
+    console.error(`Error sending game data: ${error.message}`);
+  }
+};
 
 const sendNecessaryData = async (io, tableId) => {
   try {
@@ -246,15 +282,16 @@ const sendPlayerActionResult = async (io, tableId, actionResult) => {
   }
 };
 
-const checkReconnection = async (tableId, userId) => {
+const checkReconnection = async (tableId, userId, io) => {
   
   const pokerTable = await PokerDesk.findById(tableId);
 
   const isAlreadySeated = await pokerTable.isUserSeated(userId);
   if (isAlreadySeated) {
     await pokerTable.updateSeatStatus(userId,"active");
+    await sendSeatData(io,tableId);
   }
- 
+
 }
 
 export default function handler(req, res) {
@@ -332,7 +369,7 @@ export default function handler(req, res) {
           console.log(`User ${currentUserId} registered at table ${tableId}`);
           console.log("socket registry",socketRegistry);
           // Add the socket to the registry with userId, tableId, and socket.id
-          addSocket(currentUserId, tableId, socket.id);
+          addSocket(currentUserId, tableId, socket.id,io);
           console.log("socket registry",socketRegistry);
           // Emit an event confirming registration success (optional)
           socket.emit("registrationSuccess", { message: "User registered successfully" });
@@ -361,7 +398,7 @@ export default function handler(req, res) {
           console.log(`User ${currentUserId} registered at table ${tableId}`);
           console.log("socket registry",socketRegistry);
           // Add the socket to the registry with userId, tableId, and socket.id
-          addSocket(userId, tableId, socket.id);
+          addSocket(userId, tableId, socket.id,io);
           console.log("socket registry",socketRegistry);
           // Emit an event confirming registration success (optional)
           socket.emit("registrationSuccess", { message: "User registered successfully" });
@@ -372,7 +409,7 @@ export default function handler(req, res) {
           // await pokerTable.addObserver(userId);
          // await updateTableForRoom(io, tableId); 
         //  await checkAndUpdateGameForRoom(io, tableId);
-        await sendSeatData(io, tableId);
+        await sendGame(io, tableId);
         } catch (error) {
           console.error(`Error joining table: ${error.message}`);
           socket.emit("error", { message: "Error joining table" });
@@ -382,8 +419,10 @@ export default function handler(req, res) {
        
        socket.on('playerAction', async ({ tableId, action, amount, userId }) => {
         try {
-          console.log("tableId",tableId);
-          if (!userId || !currentTableId) {
+           
+          console.log("consoling the obje",{ tableId, action, amount, userId });
+          
+          if (!userId) {
             throw new Error('User not registered or not in a table.');
           }
 
@@ -506,8 +545,7 @@ export default function handler(req, res) {
       // Handle user disconnection
       socket.on("disconnect", async () => {
         console.log(`Client disconnected: ${socket.id}`);
-        removeSocket(socket.id);
-
+        removeSocket(socket.id,io);
         if (currentTableId && currentUserId) {
           const pokerTable = await PokerDesk.findById(currentTableId);
           if (pokerTable) {

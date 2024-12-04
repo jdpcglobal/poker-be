@@ -38,6 +38,15 @@ export default async function handler(req, res) {
       });
     }
 
+    if ( type == "deposit" &&  !imageUrl) {
+      return res.status(400).json({
+        message: 'Bank ID, amount, type, and image URL are required.',
+      });
+    } 
+     if( type == "withdraw" &&  !imageUrl) {
+        imageUrl = "dfsghfdghjgfdsfgh";
+     }
+
     // Check if the user exists and is active
     const user = await User.findById(userId).select('_id status');
     if (!user || user.status !== 'active') {
