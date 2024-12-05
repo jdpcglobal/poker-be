@@ -62,105 +62,16 @@ const determineWinners = (playerHands: IPlayerHand[], sidePot: ISidePot): string
   return sortedHands.map(hand => hand.playerId); // Returns sorted player IDs based on their ranking
 };
 
-// Main function to evaluate side pots
-// export const evaluatePots = (players: IPlayer[], communityCards: ICard[], pots: WPot[]): IPot[] => {
-//   // Evaluate hands for all players
-//   console.log("hii heros what is your plan ");
-//   const playerHands = evaluateHands(players, communityCards);
-//   console.log("Player Hands:", playerHands);
-
-//   // Map WPots to IPots by evaluating winners for each pot
-//   const evaluatedPots: IPot[] = pots.map((pot) => {
-//     // Filter eligible hands based on contributors to the pot
-    
-//     const eligibleHands = playerHands.filter(hand =>
-//       hand.hand !== 'folded' && 
-//       pot.contributors.some(contributor => contributor.playerId.toString() === hand.playerId.toString())
-//     );
-    
-  
-//     console.log(`Eligible Hands for Pot ${pot.amount}:`, eligibleHands);
-
-//     // Sort hands by hand rank and high card to determine winners
-//     const sortedHands = eligibleHands.sort((a, b) =>
-//       b.handRank - a.handRank || b.highCard - a.highCard
-//     );
-
-//     console.log(`Sorted Hands for Pot ${pot.amount}:`, sortedHands);
-
-//     // Determine the top-ranked hand(s) for the current pot
-//     if (sortedHands.length === 0) {
-//       // No eligible hands, return pot without winners
-//       return {
-//         amount: pot.amount,
-//         contributors: pot.contributors,
-//         winners: {}
-//       };
-//     }
-
-//     const topRanking = sortedHands[0];
-//     const topWinners = sortedHands.filter(hand =>
-//       hand.handRank === topRanking.handRank && hand.highCard === topRanking.highCard
-//     );
-
-//     console.log(`Top Ranking Hand for Pot ${pot.amount}:`, topRanking);
-//     console.log(`Top Winners for Pot ${pot.amount}:`, topWinners);
-
-//     // Calculate the winning share for each top winner
-//     const individualShare = pot.amount / topWinners.length;
-
-//     // Build the winners map with playerId and winning amount
-//     const winners = topWinners.reduce((acc, winner) => {
-//       acc[winner.playerId] = individualShare;
-//       return acc;
-//     }, {} as { [playerId: string]: number });
-
-//     // Return the IPot structure
-//     return {
-//       amount: pot.amount, // Total pot amount
-//       contributors: pot.contributors, // Contributors remain the same
-//       winners, // Winners with their winning amounts
-//     };
-//   });
-
-//   return evaluatedPots; // Return the updated pots as IPot[]
-// };
-
 export const evaluatePots = (players: IPlayer[], communityCards: ICard[], pots: WPot[]): IPot[] => {
-  // Evaluate hands for all players
-  console.log("these are pots", pots);
-  
   const playerHands = evaluateHands(players, communityCards);
-  
-  console.log("playerHands in evavlute pot function", playerHands);
-  // Map WPots to IPots by evaluating winners for each pot
   const evaluatedPots: IPot[] = pots.map(pot => {
-    // Filter eligible hands based on contributors to the pot
-    console.log("playerHands in pots for loop", playerHands )
-  
-    // const eligibleHands: any = [];
-    // playerHands.forEach(hand => {
-    //   console.log("hand in for loop", hand);
-    //   pot.contributors.forEach(contributor => {
-    //     console.log("contributor in for loop", contributor);
-    //     console.log("is if matched", contributor.playerId === hand.playerId.toString() && hand.hand !== 'folded');
-    //     console.log("is if matched without hand", contributor.playerId === hand.playerId.toString());
-    //     if (contributor.playerId === hand.playerId.toString() && hand.hand !== 'folded') {
-    //       eligibleHands.push(hand);
-    //     }
-    //   });
-    // });
+
+    
     const eligibleHands = playerHands.filter(hand => {
-      console.log("hand in filter loop", hand);
       return pot.contributors.some(contributor => {
-        console.log("contributor in filter loop", contributor);
-        console.log("is if matched", contributor.playerId === hand.playerId.toString() && hand.hand !== 'folded');
-        console.log("is if matched without hand", contributor.playerId === hand.playerId.toString());
         return contributor.playerId === hand.playerId.toString() && hand.hand !== 'folded';
       });
-    });
-     
-    console.log("eligibleHands", eligibleHands);
+    }); 
 
     // If no eligible hands, return pot without winners
     if (eligibleHands.length === 0) {

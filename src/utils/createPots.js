@@ -21,46 +21,12 @@ export const convertRoundsToTotalBets = (rounds) => {
 
     return totalBets;
   }
-
-  // Example rounds data
-//   const rounds = [
-//     {
-//       roundNumber: 1,
-//       actions: [
-//         { userId: 'player1', amount: 1, action: 'small-blind' },
-//         { userId: 'player2', amount: 2, action: 'big-blind' },
-//         { userId: 'player3', amount: 4, action: 'raise' },
-//         { userId: 'player4', amount: 4, action: 'call' },
-//         { userId: 'player5', amount: 3, action: 'all-in' },
-//         { userId: 'player6', amount: 4, action: 'call' },
-//         { userId: 'player1', amount: 3, action: 'all-in' },
-//         { userId: 'player2', amount: 2, action: 'call' },
-//       ]
-//     },
-//     {
-//       roundNumber: 2,
-//       actions: [
-//         { userId: 'player2', amount: 8, action: 'raise' },
-//         { userId: 'player3', amount: 8, action: 'call' },
-//         { userId: 'player4', amount: 8, action: 'call' },
-//         { userId: 'player6', amount: 12, action: 'raise' },
-//         { userId: 'player2', amount: 0, action: 'fold' },
-//         { userId: 'player3', amount: 4, action: 'call' },
-//         { userId: 'player4', amount: 4, action: 'call' },
-//         { userId: 'player2', amount: 4, action: 'check' },
-//       ]
-//     }
-
-//   ];
-
-  // Convert rounds to totalBets
- // const totalBets = convertRoundsToTotalBets(rounds);
- // console.log(totalBets);
+  
  const createPots = (rounds) => {
     let pots = []; // This will hold the pots as they are created
     let totalBets = convertRoundsToTotalBets(rounds);
     while (true) {
-        console.log(totalBets);
+        
         // Get all the remaining players with non-zero bets
         let remainingPlayers = Object.keys(totalBets).filter(
             (player) => totalBets[player].amount > 0
@@ -142,9 +108,4 @@ export const convertRoundsToTotalBets = (rounds) => {
 
 export default createPots ;
 
-
-// // Create pots based on the totalBets object
-// const pots = createPots(totalBets);
-
-// // Output the resulting pots
-// console.log(pots);
+ 

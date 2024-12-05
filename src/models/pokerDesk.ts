@@ -136,39 +136,7 @@ PokerDeskSchema.pre<IPokerTable>('save', function (next) {
   this.updatedAt = new Date();
   next();
 });
-
-// Method to handle adding a user to a seat
-// PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat> {
-  
-//   if(userId && buyInAmount){
-//   if (this.seats.length >= this.maxSeats) {
-//     throw new Error('No available seats.');
-//   }
-
-//   const seatNumber = this.seats.length + 1;
-
-//   const newSeat: ISeat = {
-//     seatNumber,
-//     userId,
-//     buyInAmount,
-//     balanceAtTable: buyInAmount,
-//     isSittingOut: false,
-//   };
-
-//   this.seats.push(newSeat);
-//   this.totalBuyIns += buyInAmount;
-
-//   try {
-//     await this.save();
-//     return newSeat;
-//   } catch (error: any) {
-//     throw new Error('Error saving the updated table: ' + error.message);
-//   } 
-// }else{
-//   throw new Error('Error saving the updated table: userid is required');
-// }
-// };
-
+ 
 PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat> {
   // Validate input parameters
   if (!userId || !buyInAmount) {
@@ -188,7 +156,6 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
 
   // Check if user has sufficient balance
   if (user.wallet.balance < buyInAmount) {
-    console.log("userWallet Balnce is ",user.wallet.balance)
     throw new Error('Insufficient balance to join the table.');
   }
 
@@ -237,10 +204,7 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   try {
     await user.save(); // Save user with updated balance and transaction
     const activePlayersCount = this.seats.filter((seat: ISeat) => seat.status === 'active').length;
-     const isTrue = activePlayersCount >= this.minPlayerCount && this.currentGame?.status !== 'in-progress';
-     console.log("fasdfasdfasdfsadf", activePlayersCount >= this.minPlayerCount );
-     console.log("we are here we are there mai hoo na", this.currentGame !== null);
-     console.log("mai hoo na",this.currentGame?.status !== 'in-progress');
+    // const isTrue = activePlayersCount >= this.minPlayerCount && this.currentGame?.status !== 'in-progress';
      
     // if (activePlayersCount >= this.minPlayerCount && this.currentGame !== null && this.currentGame?.status !== 'in-progress') {
     //   console.log('Min player count reached and game finished. Creating a new game...');
@@ -253,29 +217,6 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     throw new Error('Error saving the updated table or user: ' + error.message);
   }
 };
-
-// Method for handling a user leaving a seat
-// PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
-//   // Find the seat occupied by the user
-//   const seatToRemove = this.seats.find((seat: ISeat) => seat.userId && seat.userId.equals(userId));
-
-//   if (!seatToRemove) {
-//     throw new Error('User is not seated at this table.');
-//   }
-
-//   // Update the user's balance directly
-//   await User.findByIdAndUpdate(userId, { $inc: { balance: seatToRemove.balanceAtTable } });
-
-//   // Filter out the seat from the array
-//   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
-
-//   try {
-//     await this.save();
-//     return seatToRemove.seatNumber;
-//   } catch (error: any) {
-//     throw new Error('Error saving the updated table: ' + error.message);
-//   }
-// };
 
 PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
   // Find the seat occupied by the user
@@ -345,22 +286,17 @@ PokerDeskSchema.methods.updateSeatStatus = async function (
         const seat = this.seats.find((seat: ISeat) => seat.userId?.equals(userId));
         if (seat) {
           seat.status = 'disconnected';
-          console.log(`User ${userId} status updated to 'disconnected' at table ${this._id}`);
         }
-      } else {
-        // If no game is active, remove the user from the seat and return their balance
-        await this.userLeavesSeat(userId);
-        console.log(`User ${userId} has left the seat as there is no active game at table ${this._id}`);
+      } else { 
+        await this.userLeavesSeat(userId); 
       }
     } else if (status === 'active' || status === 'sittingOut') {
       // Set the user's seat status to active
       const seat = this.seats.find((seat: ISeat) => seat.userId?.equals(userId));
       if (seat) {
-        seat.status = 'active';
-        console.log(`User ${userId} status updated to 'active' at table ${this._id}`);
+        seat.status = 'active'; 
       }
     } 
-
     // Save changes to the desk instance
     await this.save();
   } catch (error: any) {
@@ -552,7 +488,6 @@ PokerGameSchema.methods.getFirstActivePlayer = function (): mongoose.Types.Objec
 
 PokerGameSchema.methods.startNextRound = async function (prevRoundName?: 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown') {
   // Define the round order
-  console.log("new round started intiate ")
   const roundOrder = ['pre-flop', 'flop', 'turn', 'river', 'showdown'];
   let roundName;
   // Determine the next round based on prevRoundName
@@ -621,163 +556,13 @@ PokerGameSchema.methods.startNextRound = async function (prevRoundName?: 'pre-fl
   await this.save();
 };
 
-// PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Types.ObjectId, action: PlayerAction, amount: number = 0) {
-//   if (!this.currentGame.currentTurnPlayer.equals(userId)) {
-//     throw new Error("It's not this player's turn");
-//   }
-
-//   const player = this.seats.find(seat => seat.userId.equals(userId));
-//   const playerSeat = this.currentGame.players.find(p => p.userId.equals(userId));
-//   if (!player) throw new Error('Player not found.');
-
-//   const currentRound = this.currentGame.rounds[this.currentGame.rounds.length - 1];
-//   if (!currentRound || currentRound.name === "showdown") {
-//     throw new Error('No round in progress');
-//   }
-
-//   let playerTotalBet = 0; // Total bet of the current player
-//   let maxBet = 0; // Maximum bet from any player
-
-//   // Check if currentRound exists and has actions
-//   if (currentRound?.actions?.length) {
-//     // Step 1: Map player bets and calculate total bets in a single pass
-//     const playerBets = currentRound.actions.reduce((acc, action) => {
-//       // Aggregate each player's bets
-//       acc[action.userId] = (acc[action.userId] || 0) + action.amount;
-//       // Update maxBet directly during the reduction
-//       maxBet = Math.max(maxBet, acc[action.userId]);
-//       return acc;
-//     }, {});
-
-//     // Get the current player's total bet
-//     playerTotalBet = playerBets[userId] || 0; // Default to 0 if the user has no bets
-//     console.log("Player Bets:", playerBets); // Debugging player bets
-//   }
-
-//   const callAmount = Math.max(0, maxBet - playerTotalBet); // Avoid negative call amounts
-//   let newAction = {
-//     userId: userId,
-//     timestamp: new Date(),
-//     action: 'fold',
-//     amount: 0
-//   };
-
-//   if (action === 'fold') {
-//     playerSeat.status = 'folded';
-//     newAction.action = 'fold';
-
-//   } else if (action === 'check') {
-//     if (callAmount === 0) {
-//       newAction.action = 'check';
-//     }
-//   } else if (action === 'call' && callAmount > 0) {
-//     // Player matches the current highest bet
-//     if (callAmount === 0) {
-//       newAction.action = 'check';
-//     }
-//     if (player.balanceAtTable < callAmount) throw new Error('Insufficient balance to call.');
-
-//     player.balanceAtTable -= callAmount;
-//     playerSeat.balanceAtTable -= callAmount;
-//     playerSeat.totalBet += callAmount;
-//     this.currentGame.pot += callAmount;
-
-//     newAction.action = 'call';
-//     newAction.amount = callAmount;
-
-//   } else if (action === 'raise') {
-//     const minRaiseAm = Math.ceil(this.currentGame.pot * 0.25);
-//     let minRaiseAmount = callAmount + minRaiseAm;
-//     console.log(minRaiseAmount);
-//     if (amount < minRaiseAmount || amount < callAmount) {
-//       throw new Error(`Raise amount must be greater than or equal to ${minRaiseAmount}.`);
-//     }
-
-//     if (player.balanceAtTable < amount) throw new Error('Insufficient balance to raise.');
-
-//     player.balanceAtTable -= amount;
-//     playerSeat.totalBet += amount;
-//     playerSeat.balanceAtTable -= amount;
-//     this.currentGame.pot += amount;
-
-//     newAction.action = 'raise';
-//     newAction.amount = amount;
-
-//   } else if (action === 'all-in') {
-//     const allInAmount = player.balanceAtTable;
-//     playerSeat.status = 'all-in';
-//     player.balanceAtTable = 0;
-//     playerSeat.totalBet += allInAmount;
-//     playerSeat.balanceAtTable -= allInAmount;
-//     this.currentGame.pot += allInAmount;
-
-//     newAction.action = 'all-in';
-//     newAction.amount = allInAmount;
-
-//   } else {
-//     throw new Error('Invalid action.');
-//   }
-
-//   currentRound.actions.push(newAction);
-//   const activePlayers = this.currentGame.players.filter(p => p.status === 'active');
-//   console.log("activePlayers length", activePlayers.length);
-//   console.log("activePlayers", activePlayers);
-  
-//   if (activePlayers.length <= 1) {
-//     await this.showdown();
-//     console.log('Game will end, as there are one or no active players.');
-//     return;
-//   } else {
-//     const actionPlayerIds = new Set(currentRound.actions.map(action => action.userId.toString()));
-//     const nextPlayerId = await this.currentGame.getNextActivePlayer(userId);
-//     const nextPlayerIdStr = nextPlayerId.toString();
-//     const nextPlayerHasActed = actionPlayerIds.has(nextPlayerIdStr);
-
-//     if (!nextPlayerHasActed) {
-//       console.log('Round is not complete, waiting for all active players to act.');
-//       this.currentGame.currentTurnPlayer = nextPlayerId;
-//     } else {
-//       // Calculate the total bet amounts for each player
-//       const totalBets = currentRound.actions.reduce((acc, action) => {
-//         const { userId, amount } = action;
-//         if (amount >= 0) {
-//           acc[userId.toString()] = (acc[userId.toString()] || 0) + amount;
-//         }
-//         return acc;
-//       }, {} as Record<string, number>);
-
-//       const uniqueBets = new Set(Object.values(totalBets));
-
-//       if (uniqueBets.size === 1) {
-//         console.log("All players have equal total bets.");
-//         if (currentRound.name === 'river') {
-//           console.log("calling showdown method", currentRound.name);
-//           await this.showdown();
-//         } else {
-//           console.log("the current round is", currentRound.name);
-//           await this.currentGame.startNextRound(currentRound.name);
-//         }
-//       } else {
-//         console.log('Not all players have bet the same amount, waiting for next actions.');
-//         this.currentGame.currentTurnPlayer = nextPlayerId;
-//       }
-//     }
-//   }
-
-//   // Save the parent document at the end of the method
-//   await this.save();
-//   console.log("Game state updated successfully");
-// };
- 
-
-
 PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Types.ObjectId, action: PlayerAction, amount: number = 0) {
   if (!this.currentGame.currentTurnPlayer.equals(userId)) {
     throw new Error("It's not this player's turn");
   }
 
-  const player = this.seats.find((seat:ISeat) => seat.userId.equals(userId));
-  const playerSeat = this.currentGame.players.find((p : IPlayer) => p.userId.equals(userId));
+  const playerSeat : ISeat = this.seats.find((seat:ISeat) => seat.userId.equals(userId));
+  const player : IPlayer = this.currentGame.players.find((p : IPlayer) => p.userId.equals(userId));
   if (!player) throw new Error('Player not found.');
 
   const currentRound = this.currentGame.rounds[this.currentGame.rounds.length - 1];
@@ -793,6 +578,12 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     maxBet = Math.max(maxBet, acc[action.userId]);
     return acc;
   }, {}) || {};
+
+  const maxBalance: number = this.currentGame.players.reduce(
+    ({ maxBalance }: { maxBalance: number }, currentPlayer: IPlayer) => Math.max(maxBalance, currentPlayer.balanceAtTable),
+    0 // Ensure a minimum value of 0
+  );
+
   playerTotalBet = playerBets[userId.toString()] || 0;
 
   const callAmount : number = Math.max(0, maxBet - playerTotalBet); // To avoid negative values
@@ -800,53 +591,39 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
 
   // Handle actions
   if (action === 'fold') {
-    playerSeat.status = 'folded';
+    player.status = 'folded';
     newAction.action = 'fold';
 
   } else if (action === 'check' && callAmount === 0) {
     newAction.action = 'check';
 
-  } else if (action === 'call' || action === 'raise' || "all-in") {
+  } 
+  else if (action === 'call' || action === 'raise' || "all-in") {
     const isRaise = action === 'raise';
     let finalAmount = isRaise ? amount : callAmount;
-    console.log("here we are 123 ... ", amount);
     if(action !== "all-in"){
     // Handle all-in condition
     if (finalAmount >= player.balanceAtTable) {
-      console.log("here we are 323 ... ", amount);
-      console.log("here we are 323 ... ", finalAmount);
       finalAmount = player.balanceAtTable;
       newAction.action = 'all-in';
-      playerSeat.status = 'all-in';
-
+      player.status = 'all-in';
     } else if (finalAmount < player.balanceAtTable) {
-      console.log("here we are 423 ... ", amount);
-      console.log("here we are 423 ... ", finalAmount);
       // If final amount is less, auto-check or all-in
-      if (finalAmount === callAmount) {
-        console.log("here we are 523 ... ", amount);
-        console.log("here we are 523 ... ", finalAmount);
+      if (finalAmount === callAmount) { 
         newAction.action = 'call';
       }
-      //  else {
-      //   newAction.action = callAmount === 0 ? 'check' : 'all-in';
-      //   finalAmount = player.balanceAtTable;
-        
-      //   console.log("here we are 623 ... ", amount);
-      //   console.log("here we are 623 ... ", finalAmount);
-      // }
     }
    }else{
        newAction.action = callAmount === 0 ? 'check' : 'all-in';
         finalAmount = player.balanceAtTable;
-        
-        console.log("here we are 623 ... ", amount);
-        console.log("here we are 623 ... ", finalAmount);
+        if( newAction.action == 'all-in'){ 
+          player.status = 'all-in';
+        } 
    }
 
     // Adjust balances
     player.balanceAtTable -= finalAmount;
-    playerSeat.totalBet += finalAmount;
+    player.totalBet += finalAmount;
     playerSeat.balanceAtTable -= finalAmount;
     this.currentGame.totalBet += finalAmount;
     newAction.amount = finalAmount;
@@ -855,47 +632,64 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
     throw new Error('Invalid action.');
   }
 
-  currentRound.actions.push(newAction);
-
+  currentRound.actions.push(newAction); 
   // Check remaining active players
   const activePlayers = this.currentGame.players.filter((p : IPlayer) => p.status === 'active' ||  p.status === 'all-in' );
- 
-  if (activePlayers.length <= 1) {
+
+  if (activePlayers.length <= 1) { 
     await this.showdown();
-  } else {
+  } 
+  else {
+    const activeN = this.currentGame.players.filter((p : IPlayer) => p.status === 'active');
+    
     const actionPlayerIds = new Set(currentRound.actions.map((a:IPlayerActionRecord) => a.userId.toString()));
     const nextPlayerId = await this.currentGame.getNextActivePlayer(userId);
-    const nextPlayerHasActed = actionPlayerIds.has(nextPlayerId.toString());
     const activeCount = activePlayers.filter((p:IPlayer) => p.status === 'active').length;
-    if (!nextPlayerHasActed) {
+    if(!nextPlayerId){
+      await this.showdown();
+      return;
+    }else{
+      if (activeCount <= 1){
+        const nextPlayerTotalBet = playerBets[nextPlayerId.toString()] || 0;
+        let nextMaxBet =  callAmount;
+        if(newAction.amount >= nextMaxBet){
+          nextMaxBet = newAction.amount;
+        }
+        const NextPlayerCallAmount : number = Math.max(0, nextMaxBet - nextPlayerTotalBet);
+        if(NextPlayerCallAmount === 0){
+          await this.showdown();
+          return;
+        }
+      } 
+    }
+
+    const nextPlayerHasActed = actionPlayerIds.has(nextPlayerId.toString());
+   
+    if (!nextPlayerHasActed) { 
       this.currentGame.currentTurnPlayer = nextPlayerId;
     } else {
+
       interface ITotalBets {
         [userId: string]: number; // Allow string keys for user IDs
-    }
-    
+      }
+
     const totalBets = currentRound.actions.reduce((acc: ITotalBets, action: IPlayerActionRecord) => {
         acc[action.userId.toString()] = (acc[action.userId.toString()] || 0) + action.amount;
         return acc;
     }, {} as ITotalBets); // Type assertion for the initial value
     
       const uniqueBets = new Set(Object.values(totalBets));
-      console.log("we are here there active count is ", activeCount);
-      console.log("f1",uniqueBets.size === 1 && activeCount <= 1);
-      console.log("f2",uniqueBets.size === 1 && currentRound.name === 'river' );
-      console.log("f3",uniqueBets.size === 1);
-      if (uniqueBets.size === 1 && currentRound.name === 'river' || uniqueBets.size === 1 && activeCount === 1 || activeCount <= 0 ) {
-        console.log("we are here there active count is loop ", activeCount)
+       
+      if (uniqueBets.size === 1 && currentRound.name === 'river' || uniqueBets.size === 1 && activeCount === 1 || activeCount <= 0 ) {         
         await this.showdown();
       } else if (uniqueBets.size === 1) {
-        await this.currentGame.startNextRound(currentRound.name);
+         await this.currentGame.startNextRound(currentRound.name);
       } 
       else {
         this.currentGame.currentTurnPlayer = nextPlayerId;
       }
     }
   }
-
   // Save state and return the player's action
   await this.save();
   return newAction;
@@ -904,9 +698,6 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
 
 
 PokerDeskSchema.methods.showdown = async function () {
-  // Check if there is a current game in progress
-
-  console.log("we are here in show down mathod"); 
 
   if (!this.currentGame || this.currentGame.status !== 'in-progress') {
     throw new Error('Game is not currently in progress.');
@@ -914,7 +705,6 @@ PokerDeskSchema.methods.showdown = async function () {
 
   for (const player of this.currentGame.players) {
     if (player.status === 'disconnected') {
-      console.log(`Player ${player.userId} is disconnected, removing from seat`);
       await this.userLeavesSeat(player.userId);
     }
   }
@@ -926,41 +716,25 @@ PokerDeskSchema.methods.showdown = async function () {
 
   // Evaluate hands for eligible players
   const playerHands = evaluateHands(eligiblePlayers, this.currentGame.communityCards);
-  console.log(`playerHands`, playerHands);
-
-  console.log("we are here in show down mathod with player hands"); 
-  const gamePots = createPots(this.currentGame.rounds)
   
-  console.log("gamePots", gamePots);
+  const gamePots = createPots(this.currentGame.rounds)
   // Evaluate pots and determine winners
   const potResults = evaluatePots(this.currentGame.players, this.currentGame.communityCards, gamePots);
-  console.log("we are here in show down mathod with player hands after pot results");
-
-  console.log("Pot Results", potResults);
-
   // Save the evaluated pot results to the current game
   this.currentGame.pots = potResults;
-
   // Process each pot to distribute winnings
- // Process each pot to distribute winnings
-for (const pot of potResults) {
-  const winners = pot.winners;
 
-  // Log winners for the current pot
-  console.log(`Winners for Pot ${pot.amount}:`, winners);
+ for (const pot of potResults) {
+  const winners = pot.winners;
 
   // If there are winning players, distribute the winnings
   if (winners.length > 0) {
     // Update each winning player's balance using the winning amounts from evaluatePots
     for (const winner of winners) {
       const { playerId, amount } = winner; // Extract playerId and winning amount
-      console.log("playerId",playerId)
       const playerSeat = this.seats.find((seat:ISeat) => seat.userId.toString() === playerId.toString());
-      console.log(playerSeat);
       if (playerSeat) {
-        // Use the winning amount directly from the winners array
         playerSeat.balanceAtTable += amount; // Distribute winnings
-        console.log(`Updated balance for playerId ${playerId}:`, playerSeat.balanceAtTable);
       }
     }
   }
@@ -970,8 +744,8 @@ for (const pot of potResults) {
     deskId: this._id, // Assuming this is the desk's ID
     players: this.currentGame.players,
     currentTurnPlayer: this.currentGame.currentTurnPlayer,
-    pot: this.currentGame.pot,
-    status: this.currentGame.status,
+    pot: this.currentGame.totalBet,
+    status: 'finished',
     rounds: this.currentGame.rounds,
     communityCards: this.currentGame.communityCards,
     pots: potResults,
@@ -981,11 +755,10 @@ for (const pot of potResults) {
 
   // Set the current game status to finished
   this.currentGame.status = 'finished';
-   
+   this.currentGame.pots = potResults;
   // Save the updated desk state to the database
   await this.save();
 };
-
 
 const PokerDesk = mongoose.models.PokerDesk || mongoose.model<IPokerTable>('PokerDesk', PokerDeskSchema);
  
