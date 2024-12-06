@@ -127,6 +127,7 @@ export interface IPokerTable extends mongoose.Document {
   removeObserver(userId: mongoose.Types.ObjectId): Promise<void>;
   updateSeatStatus(userId: mongoose.Types.ObjectId, status: 'active' | 'disconnected' | 'sittingOut'): Promise<void>;
   isUserSeated(userId: mongoose.Types.ObjectId): boolean;
+  addWalletBalance(userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<void>;
 }
 
 export interface IBankAccount {

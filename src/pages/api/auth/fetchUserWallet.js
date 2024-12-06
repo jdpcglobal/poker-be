@@ -28,14 +28,15 @@ export default async function handler(req, res) {
         'wallet.lockedBonus': 1,
       });
       
+       
     
-    if (!wallet || !wallet.balance) {
+    if (!wallet || !wallet.wallet) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     res.status(200).json({
-      message: 'Transactions fetched successfully',
-      wallet: wallet,
+      message: 'wallet fetched successfully',
+      wallet: wallet.wallet,
     });
 
   } catch (error) {

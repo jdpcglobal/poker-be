@@ -88,6 +88,10 @@ export default async function handler(req, res) {
     token, 
     userName: user.username, 
     userId: user._id, 
-    userWallet: user.wallet 
+    wallet: {
+      balance : user.wallet.balance,
+      instantBonus: user.wallet.instantBonus,
+      lockedBonus: user.wallet.lockedBonus,
+    }
   });
 }

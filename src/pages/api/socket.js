@@ -4,6 +4,7 @@ import PokerDesk from "../../models/pokerDesk";
 import User from "../../models/user"; // Adjust path if needed
 import dbConnect from "../../config/dbConnect";
 const socketRegistry = {};
+const activeTimers = {}; 
 
 // Add a socket to the registry
 const addSocket = async (userId, tableId, socketId,io) => {
@@ -101,13 +102,39 @@ const sendSeatData = async (io, tableId) => {
     if (pokerTable.seats.length <= pokerTable.minPlayerCount) {  
       try {
         await pokerTable.createGameFromTable(tableId); // Call your createGameForTable function
-        await sendGame(io, tableId)
+       // await sendGame(io, tableId)
+       await sendGameDataAfterCreation(io, tableId);
       } catch (error) {
        
       }
         // Update currentGame
     }
   }
+};
+
+const sendSeatDataAfterGame = async (io, tableId) => {
+  const pokerTable = await PokerDesk.findById(tableId)
+  .populate("seats.userId", "username");
+
+  if (
+    !pokerTable.currentGame ||
+    pokerTable.currentGame.status !== 'in-progress'
+  ) {
+  setTimeout(async () => {
+      if (pokerTable.seats.length <= pokerTable.minPlayerCount) {  
+        try {
+          await pokerTable.createGameFromTable(tableId); // Call your createGameForTable function
+          await sendGame(io, tableId);
+        } catch (error) {
+          console.error('Error creating game:', error);
+        }
+        // Update currentGame
+      }
+    
+  }, 5000); // 5 seconds
+ } 
+ 
+ await sendSeatData(io, tableId);
 };
 
 const sendResultData = async (io, tableId) => {
@@ -153,6 +180,43 @@ const sendGameData = async (io, tableId) => {
   }
 };
 
+const sendGameDataAfterCreation = async (io, tableId) => {
+  try {
+    const pokerTable = await PokerDesk.findById(tableId);
+
+    if (!pokerTable || !pokerTable.currentGame) throw new Error("No active game for this table");
+
+    const pokerGame = pokerTable.currentGame;
+
+    const gameData = {
+      currentTurnPlayer: pokerGame.currentTurnPlayer || null,
+      totalBet: pokerGame.totalBet,
+      status: pokerGame.status,
+      communityCards: pokerGame.communityCards || [],
+      latestRound: pokerGame.rounds[pokerGame.rounds.length - 1],
+      players : pokerGame.players,
+    };
+     
+   
+    io.to(`table-${tableId}`).emit("gameData", gameData); 
+
+    const nextPlayerId = pokerGame.currentTurnPlayer;
+    if (nextPlayerId) {
+      activeTimers[tableId] = setTimeout(async () => {
+        console.log(`Auto-folding for player ${nextPlayerId}`);
+        await handlePlayerActionAndSendGame(io, tableId, nextPlayerId, 'fold', 0);
+      }, 30000); // 30 seconds timer
+    }
+
+    if(pokerGame.status === 'finished'){
+      await sendSeatData(io,tableId);
+      await sendResultData(io,tableId);
+    };
+  } catch (error) {
+    console.error(`Error sending game data: ${error.message}`);
+  }
+};
+
 const sendGame = async (io, tableId) => {
   try {
     const pokerTable = await PokerDesk.findById(tableId);
@@ -177,6 +241,78 @@ const checkReconnection = async (tableId, userId, io) => {
     await sendSeatData(io,tableId);
   }
 
+}
+
+// Encapsulated function to handle player action
+async function handlePlayerActionAndSendGame(io, tableId, userId, action, amount) {
+  try {
+    // Fetch the table and current game in one step
+    const pokerTable = await PokerDesk.findById(tableId);
+    if (!pokerTable) throw new Error('Table not found.');
+
+    const pokerGame = pokerTable.currentGame;
+    if (!pokerGame) throw new Error('Game not found.');
+
+    // If userId is provided, validate and process the action
+    if (userId) {
+      // Check if it's the player's turn
+      if (!pokerGame.currentTurnPlayer.equals(userId)) {
+        throw new Error("It's not your turn.");
+      }
+
+      // Handle the player action
+      await pokerTable.handlePlayerAction(userId, action, amount);
+
+      // Clear any existing timer for this table
+      if (activeTimers[tableId]) {
+        clearTimeout(activeTimers[tableId]);
+        delete activeTimers[tableId];
+      }
+    }
+    
+    const pokerTableSend = await PokerDesk.findById(tableId);
+
+    try {
+      if (!pokerTableSend || !pokerTableSend.currentGame) throw new Error("No active game for this table");
+  
+      const pokerGameSend = pokerTableSend.currentGame;
+  
+      const gameData = {
+        currentTurnPlayer: pokerGameSend.currentTurnPlayer || null,
+        totalBet: pokerGameSend.totalBet,
+        status: pokerGameSend.status,
+        communityCards: pokerGameSend.communityCards || [],
+        latestRound: pokerGameSend.rounds[pokerGameSend.rounds.length - 1],
+        players : pokerGameSend.players,
+      };
+       
+     
+      io.to(`table-${tableId}`).emit("gameData", gameData); 
+
+     if(pokerGameSend.status === 'finished'){
+        if (activeTimers[tableId]) {
+          clearTimeout(activeTimers[tableId]);
+          delete activeTimers[tableId];
+        }
+        await sendSeatDataAfterGame(io,tableId);
+        await sendResultData(io,tableId);
+      }else{
+        const nextPlayerId = pokerGameSend.currentTurnPlayer;
+        if (nextPlayerId) {
+          activeTimers[tableId] = setTimeout(async () => {
+            console.log(`Auto-folding for player ${nextPlayerId}`);
+            await handlePlayerActionAndSendGame(io, tableId, nextPlayerId, 'fold', 0);
+          }, 30000); // 30 seconds timer
+        }
+      }
+    } catch (error) {
+      console.error(`Error sending game data: ${error.message}`);
+    }
+
+  } catch (error) {
+    console.error(`Error in handlePlayerActionAndSendGame: ${error.message}`);
+    throw error;
+  }
 }
 
 export default function handler(req, res) {
@@ -246,36 +382,36 @@ export default function handler(req, res) {
       });
 
        
-       socket.on('playerAction', async ({ tableId, action, amount, userId }) => {
-        try {
+      socket.on('playerAction', async ({ tableId, action, amount, userId }) => {
+        // try {
           
-          if (!userId) {
-            throw new Error('User not registered or not in a table.');
-          }
+        //   if (!userId) {
+        //     throw new Error('User not registered or not in a table.');
+        //   }
 
-          const pokerTable = await PokerDesk.findById(tableId);
-          if (!pokerTable) throw new Error('Table not found.');
+        //   const pokerTable = await PokerDesk.findById(tableId);
+        //   if (!pokerTable) throw new Error('Table not found.');
 
-          const pokerGame = pokerTable.currentGame;
-          if (!pokerGame) throw new Error('Game not found.');
+        //   const pokerGame = pokerTable.currentGame;
+        //   if (!pokerGame) throw new Error('Game not found.');
 
-          // Check if it's the player's turn
-          if (!pokerGame.currentTurnPlayer.equals(userId)) {
-            throw new Error("It's not your turn.");
-          }
-          // Handle the player action
-          await pokerTable.handlePlayerAction(userId, action, amount);
+        //   // Check if it's the player's turn
+        //   if (!pokerGame.currentTurnPlayer.equals(userId)) {
+        //     throw new Error("It's not your turn.");
+        //   }
+        //   // Handle the player action
+        //   await pokerTable.handlePlayerAction(userId, action, amount);
 
-        //  await updateGameForRoom(io, tableId);
-        await sendGameData(io, tableId);
-        } catch (error) {
-          console.error(`Error handling player action: ${error.message}`);
-          socket.emit('error', { message: error.message });
-        }
+        // //  await updateGameForRoom(io, tableId);
+        // await sendGameData(io, tableId);
+        // } catch (error) {
+        //   console.error(`Error handling player action: ${error.message}`);
+        //   socket.emit('error', { message: error.message });
+        // }
+        handlePlayerActionAndSendGame(io, tableId, userId, action, amount);
       });
 
       socket.on("sitAtTable", async ({ token, tableId, buyInAmount }) => {
-        console.log("hii");
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           const userId = decoded.userId; 
@@ -294,6 +430,35 @@ export default function handler(req, res) {
 
           // Add user to seat with only userId and username
           await pokerTable.addUserToSeat(userId, buyInAmount); 
+
+          await sendSeatData(io, tableId);
+           
+        } catch (error) {
+          console.error(`Error sitting at table: ${error.message}`);
+
+          socket.emit("error", { message: "Error sitting at table" });
+        }
+      });
+
+      socket.on("addBalance", async ({ token, tableId, buyInAmount }) => {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          const userId = decoded.userId; 
+
+          const pokerTable = await PokerDesk.findById(tableId); 
+
+          if (!pokerTable) throw new Error("Poker table not found"); 
+
+          const isAlreadySeated = await pokerTable.isUserSeated(userId);
+          if (!isAlreadySeated) {
+            socket.emit("error", {
+              message: "player not seated on this table",
+            });
+            return;
+          }
+
+          // Add user to seat with only userId and username
+          await pokerTable.addWalletBalance(userId, buyInAmount); 
 
           await sendSeatData(io, tableId);
            

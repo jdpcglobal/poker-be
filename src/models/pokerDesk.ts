@@ -143,6 +143,10 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     throw new Error('User ID and buy-in amount are required.');
   }
 
+  if(buyInAmount >= this.minBuyIn && buyInAmount <= this.maxBuyIn) {
+    throw new Error('buy in amount is less than minimum buy in amount or greater than maximum buyIn amount');
+  }
+
   // Check for available seats
   if (this.seats.length >= this.maxSeats) {
     throw new Error('No available seats.');
@@ -177,8 +181,10 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   this.seats.push(newSeat);
   this.totalBuyIns += buyInAmount;
 
-  // Create a wallet transaction for the buy-in
-  const transaction: IWalletTransaction = {
+
+  if(buyInAmount>0){ 
+        // Create a wallet transaction for the buy-in
+       const transaction: IWalletTransaction = {
     createdOn: new Date(),
     completedOn: new Date(),  // Will be set when completed
     status: 'successful',  // Assuming it is successful immediately
@@ -194,11 +200,10 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     type: 'deskIn',  // Transaction type indicating user joined the table
     remark: `User joined the table with seat number ${seatNumber}`,
     DeskId: this._id,  // Assuming `this._id` is the current desk's ID
-  };
-
-  // Add the transaction to the user's wallet
-  user.wallet.transactions.push(transaction);
-
+        }; 
+         // Add the transaction to the user's wallet
+        user.wallet.transactions.push(transaction); 
+  }
 
   // Save the updated user and PokerDesk instances
   try {
@@ -213,6 +218,60 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
 
     await this.save(); // Save PokerDesk with the new seat
     return newSeat; // Return the newly created seat
+  } catch (error: any) {
+    throw new Error('Error saving the updated table or user: ' + error.message);
+  }
+};
+
+PokerDeskSchema.methods.addWalletBalance = async function (userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<void> {
+  // Validate input parameters
+  if (!userId || !buyInAmount) {
+    throw new Error('User ID and buy-in amount are required.');
+  }
+
+  // Fetch user information
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found.');
+  }
+
+  // Check if user has sufficient balance
+  if (user.wallet.balance < buyInAmount) {
+    throw new Error('Insufficient balance to join the table.');
+  }
+
+ if(buyInAmount >= this.minBuyIn && buyInAmount <= this.maxBuyIn) {
+    throw new Error('buy in amount is less than minimum buy in amount or greater than maximum buyIn amount');
+  }
+  // Update user's balance
+  user.wallet.balance -= buyInAmount;
+  this.totalBuyIns += buyInAmount;
+
+  if(buyInAmount>0){ 
+        // Create a wallet transaction for the buy-in
+    const transaction: IWalletTransaction = {
+    createdOn: new Date(),
+    completedOn: new Date(),  // Will be set when completed
+    status: 'successful',  // Assuming it is successful immediately
+    amount: {
+      cashAmount: buyInAmount,
+      instantBonus: 0,
+      lockedBonus: 0,
+      gst: 0,
+      tds: 0,
+      otherDeductions: 0,
+      total: buyInAmount,  // Total is equal to the buy-in amount in this case
+    },
+    type: 'deskIn',  // Transaction type indicating user joined the table
+    remark: `User added more balance to table ${buyInAmount}`,
+    DeskId: this._id,  // Assuming `this._id` is the current desk's ID
+        }; 
+         // Add the transaction to the user's wallet
+        user.wallet.transactions.push(transaction); 
+  }
+  // Save the updated user and PokerDesk instances
+  try {
+    await user.save(); // Save user with updated balance and transaction
   } catch (error: any) {
     throw new Error('Error saving the updated table or user: ' + error.message);
   }
@@ -233,10 +292,11 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
   }
 
   // Update the user's balance and create a wallet transaction
-  const amountToAdd = seatToRemove.balanceAtTable;
+ const amountToAdd = Math.ceil(seatToRemove.balanceAtTable * 100) / 100;
 
   // Create a wallet transaction for the balance being returned to the user
-  const transaction: IWalletTransaction = {
+  if(amountToAdd>0){
+       const transaction: IWalletTransaction = {
     createdOn: new Date(),                 // Current timestamp for creation
     completedOn: new Date(),               // Timestamp when the transaction is completed
     status: 'successful',                  // Status of the transaction
@@ -252,13 +312,11 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
     type: 'deskWithdraw',                  // Type indicating user leaving the table
     remark: `User left the table and withdrew ${amountToAdd}`, // Remark for clarity
     DeskId: this._id,                      // Reference to this PokerDesk
-  };
-  
-
-  // Update the user's wallet balance
-  user.wallet.balance += amountToAdd;
-  user.wallet.transactions.push(transaction);
-
+       };
+      // Update the user's wallet balance
+      user.wallet.balance += amountToAdd;
+      user.wallet.transactions.push(transaction);
+  }
   // Filter out the seat from the array
   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
 
@@ -422,7 +480,6 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerG
   await this.save();
   return newGame;
 };
-
 
 PokerGameSchema.methods.dealCards = function (
   count: number,
@@ -703,11 +760,6 @@ PokerDeskSchema.methods.showdown = async function () {
     throw new Error('Game is not currently in progress.');
   }
 
-  for (const player of this.currentGame.players) {
-    if (player.status === 'disconnected') {
-      await this.userLeavesSeat(player.userId);
-    }
-  }
   
   // Gather players who are still eligible (active or all-in)
   const eligiblePlayers = this.currentGame.players.filter((player : IPlayer) => 
@@ -715,7 +767,7 @@ PokerDeskSchema.methods.showdown = async function () {
   );
 
   // Evaluate hands for eligible players
-  const playerHands = evaluateHands(eligiblePlayers, this.currentGame.communityCards);
+ // const playerHands = evaluateHands(eligiblePlayers, this.currentGame.communityCards);
   
   const gamePots = createPots(this.currentGame.rounds)
   // Evaluate pots and determine winners
@@ -757,7 +809,15 @@ PokerDeskSchema.methods.showdown = async function () {
   this.currentGame.status = 'finished';
    this.currentGame.pots = potResults;
   // Save the updated desk state to the database
+  
   await this.save();
+
+  for (const player of this.currentGame.players) {
+    if (player.status === 'disconnected') {
+      console.log("living seat get called ",player.userId);
+      await this.userLeavesSeat(player.userId);
+    }
+  }
 };
 
 const PokerDesk = mongoose.models.PokerDesk || mongoose.model<IPokerTable>('PokerDesk', PokerDeskSchema);
