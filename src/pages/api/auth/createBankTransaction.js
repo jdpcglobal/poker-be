@@ -30,6 +30,8 @@ export default async function handler(req, res) {
 
     // Extract parameters from request body
     const { bankId, amount, type, remark, imageUrl } = req.body;
+  
+    let imageUrl2 = imageUrl;
 
     // Validate required fields
     if (!bankId || !amount || !type || !imageUrl) {
@@ -44,7 +46,7 @@ export default async function handler(req, res) {
       });
     } 
      if( type == "withdraw" &&  !imageUrl) {
-        imageUrl = "dfsghfdghjgfdsfgh";
+        imageUrl2 = "dfsghfdghjgfdsfgh";
      }
 
     // Check if the user exists and is active
@@ -78,7 +80,7 @@ export default async function handler(req, res) {
       amount,
       type,
       remark,
-      imageUrl,
+      imageUrl : imageUrl2,
       createdOn: new Date(),
       status: 'waiting', // Default status
     });
