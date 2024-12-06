@@ -142,8 +142,8 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   if (!userId || !buyInAmount) {
     throw new Error('User ID and buy-in amount are required.');
   }
-
-  if(buyInAmount >= this.minBuyIn && buyInAmount <= this.maxBuyIn) {
+   
+  if(!(buyInAmount >= this.minBuyIn || buyInAmount <= this.maxBuyIn)) { 
     throw new Error('buy in amount is less than minimum buy in amount or greater than maximum buyIn amount');
   }
 
