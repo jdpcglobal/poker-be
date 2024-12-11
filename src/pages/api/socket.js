@@ -105,7 +105,7 @@ const sendSeatData = async (io, tableId) => {
        // await sendGame(io, tableId)
        await sendGameDataAfterCreation(io, tableId);
       } catch (error) {
-       
+       console.log(error);
       }
         // Update currentGame
     }

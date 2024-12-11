@@ -8,7 +8,7 @@ export interface IBankTransaction extends Document {
   bankId: mongoose.Types.ObjectId; // Reference to BankAccount
   createdOn: Date;
   completedOn?: Date;
-  status: 'failed' | 'completed' | 'successful' | 'waiting';
+  status: 'failed' | 'completed' | 'pending';
   amount: number;
   type: 'deposit' | 'withdraw';
   remark?: string;
@@ -30,7 +30,7 @@ const BankTransactionSchema: Schema<IBankTransaction> = new Schema({
   completedOn: { type: Date },
   status: {
     type: String,
-    enum: ['failed', 'completed', 'successful', 'waiting'],
+    enum: ['failed', 'completed', 'pending'],
     required: true,
   },
   amount: { type: Number, required: true },

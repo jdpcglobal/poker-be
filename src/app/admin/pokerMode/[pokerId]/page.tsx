@@ -13,6 +13,7 @@ interface PokerMode {
   bType: 'blinds' | 'antes' | 'both';
   status: 'active' | 'disable';
   description?: string;
+  mode : 'cash' | 'practice';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,7 @@ const PokerModeAdmin: React.FC = () => {
     minPlayerCount: 0,
     bType: 'blinds',
     status: 'active',
+    mode:'cash',
     description: ''
   });
   const [editingPokerMode, setEditingPokerMode] = useState<Partial<PokerMode>>({});
@@ -85,6 +87,7 @@ const PokerModeAdmin: React.FC = () => {
         minPlayerCount: 0,
         bType: 'blinds',
         status: 'active',
+        mode : 'cash',
         description: ''
       });
       setIsModalOpen(false);
@@ -220,6 +223,7 @@ const PokerModeAdmin: React.FC = () => {
           <p className="text-gray-600">Min Buy-In: {pokerMode.minBuyIn}</p>
           <p className="text-gray-600">Max Buy-In: {pokerMode.maxBuyIn}</p>
           <p className="text-gray-600">Max Player Count: {pokerMode.minPlayerCount}</p>
+          <p className="text-gray-600">mode : {pokerMode.mode}</p>
           <p className="text-gray-600">Blinds/Antes: {pokerMode.bType}</p>
           <p className={`text-sm mt-3 ${pokerMode.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
             Status: {pokerMode.status}
@@ -305,6 +309,21 @@ const PokerModeAdmin: React.FC = () => {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   required
                 />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="mode" className="block text-sm font-medium text-gray-700">mode</label>
+                <select
+  id="mode"
+  name="mode" // Correct this if not set
+  value={editingPokerModeId ? editingPokerMode.mode : newPokerMode.mode}
+  onChange={editingPokerModeId ? handleEditChange : handleChange}
+  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+  required
+>
+  <option value="cash">Cash</option>
+  <option value="practice">Practice</option>
+        </select>
+
               </div>
               <div className="mb-4">
                 <label htmlFor="blindsOrAntes" className="block text-sm font-medium text-gray-700">Blinds or Antes</label>

@@ -1,4 +1,5 @@
 import dbConnect from '../../../../config/dbConnect';
+import Poker from '../../../../models/poker';
 import PokerDesk from '../../../../models/pokerDesk';
 import PokerMode from '../../../../models/pokerMode';
 export default async function handler(req, res) {
@@ -26,8 +27,13 @@ export default async function handler(req, res) {
     case 'POST':
       try {
         const pokerMode = await PokerMode.findById(body.pokerModeId);
+      
         if (!pokerMode) {
           return res.status(404).json({ message: 'PokerMode not found' });
+        }
+        const pokerGame = await Poker.findById(pokerMode.pokerId);
+        if (!pokerGame) {
+          return res.status(404).json({ message: 'PokerGame not found' });
         }
         const newPokerDeskData = {
           ...body,
@@ -39,6 +45,8 @@ export default async function handler(req, res) {
           minPlayerCount: pokerMode.maxPlayerCount,
           blindsOrAntes: pokerMode.blindsOrAntes,
           status: pokerMode.status,
+          gameType : pokerGame.gameType,
+          mode : pokerMode.mode,
         };
         const newPokerDesk = await PokerDesk.create(newPokerDeskData);
         res.status(201).json(newPokerDesk);

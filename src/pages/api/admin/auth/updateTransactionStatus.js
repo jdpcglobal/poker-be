@@ -59,7 +59,7 @@ export default async function handler(req, res) {
 
     if (transaction.type === 'deposit') {
       // Deposit transaction mechanism
-      if (['failed', 'waiting'].includes(transaction.status) && newStatus === 'completed') {
+      if (['failed', 'pending'].includes(transaction.status) && newStatus === 'completed') {
         // Update user wallet
         user.wallet.balance += cashAmount;
         user.wallet.balance += instantBonus; // Add GST as instant bonus
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
           type: 'deposit',
           remark: 'Bank transaction completed',
         });
-      } else if (transaction.status === 'completed' && ['failed', 'waiting'].includes(newStatus)) {
+      } else if (transaction.status === 'completed' && ['failed', 'pending'].includes(newStatus)) {
         if (user.wallet.balance >= mainAmount) {
           user.wallet.balance -= cashAmount;
           user.wallet.balance -= instantBonus; // Remove GST as instant bonus
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
       }
     } else if (transaction.type === 'withdraw') {
       // Withdraw transaction mechanism (reverse of deposit)
-      if (['failed', 'waiting'].includes(transaction.status) && newStatus === 'completed') {
+      if (['failed', 'pending'].includes(transaction.status) && newStatus === 'completed') {
         if (user.wallet.balance >= mainAmount) {
           user.wallet.balance -= cashAmount;
           user.wallet.balance -= instantBonus;
@@ -128,7 +128,7 @@ export default async function handler(req, res) {
         } else {
           return res.status(400).json({ error: 'Insufficient balance for this transaction' });
         }
-      } else if (transaction.status === 'completed' && ['failed', 'waiting'].includes(newStatus)) {
+      } else if (transaction.status === 'completed' && ['failed', 'pending'].includes(newStatus)) {
         user.wallet.balance += cashAmount;
         user.wallet.balance += instantBonus;
 

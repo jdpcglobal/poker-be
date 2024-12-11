@@ -82,7 +82,7 @@ export default async function handler(req, res) {
       remark,
       imageUrl : imageUrl2,
       createdOn: new Date(),
-      status: 'waiting', // Default status
+      status: 'pending', // Default status
     });
 
     // Save the transaction to the database

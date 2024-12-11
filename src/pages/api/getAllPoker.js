@@ -36,6 +36,7 @@ export default async function handler(req, res) {
           const commonData = {
             pokerModeId : mode._id,
             minBuyIn: mode.minBuyIn,
+            mode : mode.mode,
             maxBuyIn: mode.maxBuyIn,
             maxPlayer: mode.maxPlayerCount,
             description: mode.description,

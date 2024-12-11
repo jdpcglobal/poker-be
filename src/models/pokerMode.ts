@@ -8,9 +8,9 @@ interface IPokerMode extends Document {
   minBuyIn: number;
   maxBuyIn: number; 
   bType: 'blinds' | 'antes' | 'both' ; // To differentiate
-  status: 'active' | 'disable'; // Field for status
-  description?: string;
+  status: 'active' | 'disable'; // Field for status 
   createdAt: Date;
+  mode:  'practice' | 'cash';
   updatedAt: Date;
 }
 
@@ -21,9 +21,15 @@ const pokerModeSchema = new Schema<IPokerMode>({
     ref: 'Poker',
     required: true,
   },
+  mode: {
+    type: String,
+    enum: ['practice', 'cash'],
+    default: 'cash',
+    required: true,
+  },
   stake: {
     type: Number,
-    required: function() { return this.bType === 'blinds' || this.bType === 'antes' || this.bType === 'both'; }, // Required for both Blinds and Antes
+    required: true, // Required for both Blinds and Antes
   },
   minBuyIn: {
     type: Number,
@@ -33,7 +39,6 @@ const pokerModeSchema = new Schema<IPokerMode>({
     type: Number,
     required: true,
   },
-  
   bType : {
     type: String,
     enum: ['blinds', 'antes'],
@@ -44,11 +49,7 @@ const pokerModeSchema = new Schema<IPokerMode>({
     enum: ['active', 'disable'],
     default: 'active',
     required: true,
-  },
-  description: {
-    type: String,
-    trim: true,
-  },
+  }, 
   createdAt: {
     type: Date,
     default: Date.now,

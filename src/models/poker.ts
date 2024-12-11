@@ -2,17 +2,15 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 interface IPoker extends Document {
-  name: string;
-  communityCardsCount: number;
-  maxHoleCards: number;
-  numberOfRounds: number;
-  blindsOrAntes: 'Blinds' | 'Antes';
+  name: string; 
   objective: string;
   rules: Map<string, string>;
   description?: string;
   createdAt: Date;
   updatedAt: Date;
   status: 'active' | 'maintenance' | 'disable';
+  gameType: 'NLH' | 'PLO4' | 'PLO5' | 'OmahaHILO' | 'SDH' | 'STUD' | 'RAZZ' | 'PINEAPPLE' | 'COURCHEVEL' | '5CD' | 'BADUGI' | 'MIXED';
+  
 }
 
 const pokerSchema: Schema = new Schema({
@@ -21,22 +19,6 @@ const pokerSchema: Schema = new Schema({
     required: true,
     unique: true,
     trim: true,
-  },
-  communityCardsCount: {
-    type: Number,
-    default: 0, // Default to 0 for games without community cards
-  },
-  maxHoleCards: {
-    type: Number,
-    required: true,
-  },
-  numberOfRounds: {
-    type: Number,
-    default: 0,
-  },
-  blindsOrAntes: {
-    type: String, // 'Blinds' or 'Antes'
-    default: 'Blinds',
   },
   objective: {
     type: String,
@@ -63,6 +45,25 @@ const pokerSchema: Schema = new Schema({
     type: String, // 'active', 'maintenance', or 'notactive'
     enum: ['active', 'maintenance', 'disable'],
     default: 'active', // Default to 'active'
+  },
+  gameType: {
+    type: String,
+    enum: [
+      'NLH',       // No Limit Hold'em
+      'PLO4',      // Pot Limit Omaha (4 cards)
+      'PLO5',      // Pot Limit Omaha (5 cards)
+      'OmahaHILO', // High-Low split games (e.g., Omaha Hi-Lo)
+      'SDH',       // Short Deck Hold'em
+      'STUD',      // Seven Card Stud
+      'RAZZ',      // Razz (lowball)
+      'PINEAPPLE', // Pineapple Poker
+      'COURCHEVEL',// Courchevel Poker
+      '5CD',       // Five Card Draw
+      'BADUGI',    // Badugi Poker
+      'MIXED',     // Mixed Games (e.g., H.O.R.S.E)
+    ],
+    default : 'NLH',
+    required: true,
   },
 });
 

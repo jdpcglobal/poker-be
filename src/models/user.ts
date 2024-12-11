@@ -16,7 +16,7 @@ const AmountBreakdownSchema : Schema<IAmountBreakdown> = new Schema({
 const WalletTransactionSchema: Schema<IWalletTransaction> = new Schema({
   createdOn: { type: Date, default: Date.now },
   completedOn: { type: Date },
-  status: { type: String, enum: ['failed', 'completed', 'successful'], required: true },
+  status: { type: String, enum: ['failed', 'completed', 'pending'], required: true },
   amount: { type: AmountBreakdownSchema, required: true }, // Nested breakdown for amounts
   type: {
     type: String,

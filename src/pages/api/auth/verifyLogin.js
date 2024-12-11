@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const initialTransaction = {
       createdOn: new Date(),
       completedOn: null,
-      status: 'successful',
+      status: 'completed',
       amount: {
         cashAmount: 0,
         instantBonus: 10,

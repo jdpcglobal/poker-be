@@ -40,7 +40,7 @@ export interface RPokerGame {
 
 // Define types for player status and actions
 export type PlayerStatus = 'active' | 'all-in' | 'folded' | 'sitting-out';
-export type PlayerAction = 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'small-blind' | 'big-blind';
+export type PlayerAction = 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'small-blind' | 'big-blind' | 'ante';
 
 // Card interface
 export interface ICard {
@@ -117,9 +117,11 @@ export interface IPokerTable extends mongoose.Document {
   stake: number; // Single field for either smallBlind, bigBlind, or anteAmount
   minBuyIn: number;
   maxBuyIn: number;
-  minPlayerCount: number;
+  minPlayerCount: number; 
   bType: 'blinds' | 'antes' | 'both'; // To differentiate
   status: 'active' | 'disable'; 
+  gameType: 'NLH' | 'PLO4' | 'PLO5' | 'OmahaHILO' | 'SDH' | 'STUD' | 'RAZZ' | 'PINEAPPLE' | 'COURCHEVEL' | '5CD' | 'BADUGI' | 'MIXED';
+  mode : 'practice' | 'cash';
   // PokerDesk methods
   addUserToSeat(userId: mongoose.Types.ObjectId, buyInAmount: number): Promise<ISeat>;
   userLeavesSeat(userId: mongoose.Types.ObjectId): Promise<number>;
@@ -151,7 +153,7 @@ export interface IAmountBreakdown {
 export interface IWalletTransaction {
   createdOn: Date;                    // Timestamp when transaction was created
   completedOn?: Date;                 // Optional completion timestamp
-  status: 'failed' | 'completed' | 'successful';  // Status of the transaction
+  status: 'failed' | 'completed' | 'pending';  // Status of the transaction
   amount: IAmountBreakdown;           // Nested breakdown of amounts
   type: 'deposit' | 'withdraw' | 'deskIn' | 'deskWithdraw' | 'bonus';  // Type of transaction
   remark?: string;                    // Optional remark for the transaction

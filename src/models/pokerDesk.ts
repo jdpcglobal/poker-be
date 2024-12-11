@@ -1,4 +1,3 @@
-
 import mongoose, { Schema, Document } from 'mongoose';
 import User from './user'; // Adjust the path if necessary
 import PokerGameArchive from './pokerGameArchive';
@@ -16,7 +15,8 @@ import {
   RPokerGame,
   IWalletTransaction
 } from '../utils/pokerModelTypes'; // Adjust the path based on your folder structure
-import {evaluateHands, evaluatePots} from '../utils/pokerHand';
+// import {evaluateHands, evaluatePots} from '../utils/pokerHand';
+import {evaluatePots} from '../utils/evaluate';
 import createPots from '@/utils/createPots';
  
 // Define your Seat schema
@@ -92,6 +92,7 @@ const PokerDeskSchema = new Schema<IPokerTable>({
   maxSeats: { type: Number, required: true },
   seats: { type: [SeatSchema], default: [] },
   observers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+
   // Embed current game with its own _id
   currentGame: {
     type: PokerGameSchema,  // Embedded schema
@@ -121,10 +122,36 @@ const PokerDeskSchema = new Schema<IPokerTable>({
     enum: ['blinds', 'antes','both'],
     required: true,
   },
+   // Game types
+  gameType: {
+    type: String,
+    enum: [
+      'NLH',       // No Limit Hold'em
+      'PLO4',      // Pot Limit Omaha (4 cards)
+      'PLO5',      // Pot Limit Omaha (5 cards)
+      'OmahaHILO', // High-Low split games (e.g., Omaha Hi-Lo)
+      'SDH',       // Short Deck Hold'em
+      'STUD',      // Seven Card Stud
+      'RAZZ',      // Razz (lowball)
+      'PINEAPPLE', // Pineapple Poker
+      'COURCHEVEL',// Courchevel Poker
+      '5CD',       // Five Card Draw
+      'BADUGI',    // Badugi Poker
+      'MIXED',     // Mixed Games (e.g., H.O.R.S.E)
+    ],
+    default : 'NLH',
+    required: true,
+  },
   status: {
     type: String,
     enum: ['active', 'disable'],
     default: 'active',
+    required: true,
+  },
+  mode: {
+    type: String,
+    enum: ['practice', 'cash'],
+    default: 'cash',
     required: true,
   },
   createdAt: { type: Date, default: Date.now },
@@ -158,14 +185,14 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     throw new Error('User not found.');
   }
 
-  // Check if user has sufficient balance
+ if(this.mode === 'cash'){ // Check if user has sufficient balance
   if (user.wallet.balance < buyInAmount) {
     throw new Error('Insufficient balance to join the table.');
   }
 
   // Update user's balance
   user.wallet.balance -= buyInAmount;
-
+ }
   // Create the new seat
   const seatNumber = this.seats.length + 1;
 
@@ -181,13 +208,13 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
   this.seats.push(newSeat);
   this.totalBuyIns += buyInAmount;
 
-
+if(this.mode === 'cash'){
   if(buyInAmount>0){ 
         // Create a wallet transaction for the buy-in
-       const transaction: IWalletTransaction = {
+    const transaction: IWalletTransaction = {
     createdOn: new Date(),
     completedOn: new Date(),  // Will be set when completed
-    status: 'successful',  // Assuming it is successful immediately
+    status: 'completed',  // Assuming it is successful immediately
     amount: {
       cashAmount: buyInAmount,
       instantBonus: 0,
@@ -202,20 +229,16 @@ PokerDeskSchema.methods.addUserToSeat = async function (userId: mongoose.Types.O
     DeskId: this._id,  // Assuming `this._id` is the current desk's ID
         }; 
          // Add the transaction to the user's wallet
-        user.wallet.transactions.push(transaction); 
+    user.wallet.transactions.push(transaction); 
   }
-
-  // Save the updated user and PokerDesk instances
   try {
     await user.save(); // Save user with updated balance and transaction
-    const activePlayersCount = this.seats.filter((seat: ISeat) => seat.status === 'active').length;
-    // const isTrue = activePlayersCount >= this.minPlayerCount && this.currentGame?.status !== 'in-progress';
-     
-    // if (activePlayersCount >= this.minPlayerCount && this.currentGame !== null && this.currentGame?.status !== 'in-progress') {
-    //   console.log('Min player count reached and game finished. Creating a new game...');
-    //   await this.createGameFromTable();
-    // }
-
+  } catch (error: any) {
+    throw new Error('Error saving the updated table or user: ' + error.message);
+  }
+}
+  // Save the updated user and PokerDesk instances
+  try {
     await this.save(); // Save PokerDesk with the new seat
     return newSeat; // Return the newly created seat
   } catch (error: any) {
@@ -235,47 +258,110 @@ PokerDeskSchema.methods.addWalletBalance = async function (userId: mongoose.Type
     throw new Error('User not found.');
   }
 
-  // Check if user has sufficient balance
-  if (user.wallet.balance < buyInAmount) {
-    throw new Error('Insufficient balance to join the table.');
+  // Validate buy-in amount range
+  if (buyInAmount < this.minBuyIn || buyInAmount > this.maxBuyIn) {
+    throw new Error('Buy-in amount is less than the minimum or greater than the maximum buy-in amount.');
   }
 
- if(buyInAmount >= this.minBuyIn && buyInAmount <= this.maxBuyIn) {
-    throw new Error('buy in amount is less than minimum buy in amount or greater than maximum buyIn amount');
+  if (this.mode === 'cash') {
+    // Check if user has sufficient balance
+    if (user.wallet.balance < buyInAmount) {
+      throw new Error('Insufficient balance to add more balance to the table.');
+    }
+
+    // Deduct the buy-in amount from user's wallet
+    user.wallet.balance -= buyInAmount;
   }
-  // Update user's balance
-  user.wallet.balance -= buyInAmount;
+
+  // Increment total buy-ins
   this.totalBuyIns += buyInAmount;
 
-  if(buyInAmount>0){ 
-        // Create a wallet transaction for the buy-in
+  if (this.mode === 'cash' && buyInAmount > 0) {
+    // Create a wallet transaction for the buy-in in cash mode
     const transaction: IWalletTransaction = {
-    createdOn: new Date(),
-    completedOn: new Date(),  // Will be set when completed
-    status: 'successful',  // Assuming it is successful immediately
-    amount: {
-      cashAmount: buyInAmount,
-      instantBonus: 0,
-      lockedBonus: 0,
-      gst: 0,
-      tds: 0,
-      otherDeductions: 0,
-      total: buyInAmount,  // Total is equal to the buy-in amount in this case
-    },
-    type: 'deskIn',  // Transaction type indicating user joined the table
-    remark: `User added more balance to table ${buyInAmount}`,
-    DeskId: this._id,  // Assuming `this._id` is the current desk's ID
-        }; 
-         // Add the transaction to the user's wallet
-        user.wallet.transactions.push(transaction); 
+      createdOn: new Date(),
+      completedOn: new Date(),
+      status: 'completed',
+      amount: {
+        cashAmount: buyInAmount,
+        instantBonus: 0,
+        lockedBonus: 0,
+        gst: 0,
+        tds: 0,
+        otherDeductions: 0,
+        total: buyInAmount,
+      },
+      type: 'deskIn',
+      remark: `User added more balance to table: ${buyInAmount}`,
+      DeskId: this._id,
+    };
+
+    // Add the transaction to the user's wallet
+    user.wallet.transactions.push(transaction);
   }
+
   // Save the updated user and PokerDesk instances
   try {
-    await user.save(); // Save user with updated balance and transaction
+    if (this.mode === 'cash') {
+      await user.save(); // Save user only in cash mode
+    }
   } catch (error: any) {
-    throw new Error('Error saving the updated table or user: ' + error.message);
+    throw new Error('Error saving the updated user or table: ' + error.message);
   }
 };
+
+// PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
+//   // Find the seat occupied by the user
+//   const seatToRemove = this.seats.find((seat: ISeat) => seat.userId && seat.userId.equals(userId));
+
+//   if (!seatToRemove) {
+//     throw new Error('User is not seated at this table.');
+//   }
+
+//   // Fetch the user from the database
+//   const user = await User.findById(userId);
+//   if (!user) {
+//     throw new Error('User not found.');
+//   }
+
+//   // Update the user's balance and create a wallet transaction
+//  const amountToAdd = Math.ceil(seatToRemove.balanceAtTable * 100) / 100;
+
+//   // Create a wallet transaction for the balance being returned to the user
+//   if(amountToAdd>0){
+//     const transaction: IWalletTransaction = {
+//     createdOn: new Date(),                 // Current timestamp for creation
+//     completedOn: new Date(),               // Timestamp when the transaction is completed
+//     status: 'completed',                  // Status of the transaction
+//     amount: {                              // Updated amount structure
+//       cashAmount: amountToAdd,             // Cash portion of the transaction
+//       instantBonus: 0,                     // No instant bonus applied here
+//       lockedBonus: 0,                      // No locked bonus applied here
+//       gst: 0,                              // Assuming no GST for this transaction
+//       tds: 0,                              // Assuming no TDS deductions
+//       otherDeductions: 0,                  // Assuming no other deductions
+//       total: amountToAdd,                  // Total amount matches cashAmount
+//     },
+//     type: 'deskWithdraw',                  // Type indicating user leaving the table
+//     remark: `User left the table and withdrew ${amountToAdd}`, // Remark for clarity
+//     DeskId: this._id,                      // Reference to this PokerDesk
+//        };
+//       // Update the user's wallet balance
+//       user.wallet.balance += amountToAdd;
+//       user.wallet.transactions.push(transaction);
+//   }
+//   // Filter out the seat from the array
+//   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
+
+//   try {
+//     // Save the updated user and PokerDesk instances
+//     await user.save(); // Save user with updated balance and transaction
+//     await this.save(); // Save PokerDesk with the updated seats
+//     return seatToRemove.seatNumber; // Return the seat number that was removed
+//   } catch (error: any) {
+//     throw new Error('Error saving the updated table or user: ' + error.message);
+//   }
+// };
 
 PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.ObjectId): Promise<number> {
   // Find the seat occupied by the user
@@ -291,38 +377,41 @@ PokerDeskSchema.methods.userLeavesSeat = async function (userId: mongoose.Types.
     throw new Error('User not found.');
   }
 
-  // Update the user's balance and create a wallet transaction
- const amountToAdd = Math.ceil(seatToRemove.balanceAtTable * 100) / 100;
+  const amountToAdd = Math.ceil(seatToRemove.balanceAtTable * 100) / 100;
 
-  // Create a wallet transaction for the balance being returned to the user
-  if(amountToAdd>0){
-       const transaction: IWalletTransaction = {
-    createdOn: new Date(),                 // Current timestamp for creation
-    completedOn: new Date(),               // Timestamp when the transaction is completed
-    status: 'successful',                  // Status of the transaction
-    amount: {                              // Updated amount structure
-      cashAmount: amountToAdd,             // Cash portion of the transaction
-      instantBonus: 0,                     // No instant bonus applied here
-      lockedBonus: 0,                      // No locked bonus applied here
-      gst: 0,                              // Assuming no GST for this transaction
-      tds: 0,                              // Assuming no TDS deductions
-      otherDeductions: 0,                  // Assuming no other deductions
-      total: amountToAdd,                  // Total amount matches cashAmount
-    },
-    type: 'deskWithdraw',                  // Type indicating user leaving the table
-    remark: `User left the table and withdrew ${amountToAdd}`, // Remark for clarity
-    DeskId: this._id,                      // Reference to this PokerDesk
-       };
-      // Update the user's wallet balance
-      user.wallet.balance += amountToAdd;
-      user.wallet.transactions.push(transaction);
+  if (this.mode === 'cash' && amountToAdd > 0) {
+    // For cash mode, update user's wallet balance and create a transaction
+    const transaction: IWalletTransaction = {
+      createdOn: new Date(),
+      completedOn: new Date(),
+      status: 'completed',
+      amount: {
+        cashAmount: amountToAdd,
+        instantBonus: 0,
+        lockedBonus: 0,
+        gst: 0,
+        tds: 0,
+        otherDeductions: 0,
+        total: amountToAdd,
+      },
+      type: 'deskWithdraw',
+      remark: `User left the table and withdrew ${amountToAdd}`,
+      DeskId: this._id,
+    };
+
+    user.wallet.balance += amountToAdd;
+    user.wallet.transactions.push(transaction);
   }
-  // Filter out the seat from the array
+
+  // Remove the seat from the table
   this.seats = this.seats.filter((seat: ISeat) => !seat.userId?.equals(userId));
 
   try {
     // Save the updated user and PokerDesk instances
-    await user.save(); // Save user with updated balance and transaction
+    if (this.mode === 'cash') {
+      await user.save(); // Save user only for cash mode
+    }
+
     await this.save(); // Save PokerDesk with the updated seats
     return seatToRemove.seatNumber; // Return the seat number that was removed
   } catch (error: any) {
@@ -400,63 +489,204 @@ const generateDeck = (): ICard[] => {
   return deck;
 };
 
+// PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerGame> {
+//   // Check if a current game already exists and if it's finished
+//   if (this.currentGame && this.currentGame.status !== 'finished') {
+//     throw new Error('There is already an active game.');
+//   }
+
+
+//   // Filter and set up active players from seats, ensuring they meet the min buy-in
+//   const activePlayers = this.seats
+//     .filter((seat: ISeat) => seat.userId && seat.status === 'active' && seat.balanceAtTable >= this.minBuyIn)
+//     .map((seat:ISeat) => ({
+//       userId: seat.userId!,
+//       balanceAtTable: seat.balanceAtTable,
+//       status: 'active',
+//       totalBet: 0,
+//       holeCards: [],
+//       role: 'player',
+//     }));
+
+//   if (activePlayers.length < 2) {
+//     throw new Error('Not enough active players to start a game.');
+//   }
+
+//   let blindType = 'blind';
+
+//   switch (this.gameType) {
+//     case 'NLH': 
+//     case 'PLO4':
+//     case 'PLO5':
+//       blindType = 'blind';  
+//       break;
+//     case 'STUD':
+//     case 'RAZZ':
+//       blindType = 'ante';
+//       break;
+//     default:
+//       throw new Error('Unsupported game type.');
+//   }
+
+
+//   // Assign roles: small blind (SB) and big blind (BB)
+//   activePlayers[0].role = 'sb';
+//   activePlayers[1].role = 'bb';
+
+//   // Set SB and BB bet amounts
+//   const smallBlindAmount = 1;
+//   const bigBlindAmount = 2;
+//   activePlayers[0].totalBet = smallBlindAmount;
+//   activePlayers[1].totalBet = bigBlindAmount;
+//   activePlayers[0].balanceAtTable -= smallBlindAmount;
+//   activePlayers[1].balanceAtTable -= bigBlindAmount;
+
+//   // Initialize the pot with SB and BB
+//   const initialPotAmount = smallBlindAmount + bigBlindAmount;
+//   const deck: ICard[] = generateDeck();
+
+//   // Deal hole cards to each player
+//   activePlayers.forEach((player : IPlayer) => {
+//     player.holeCards = [deck.pop()!, deck.pop()!];
+//   });
+
+//   // Create a new game object
+//   const newGame : RPokerGame  = {
+//     players: activePlayers,
+//     currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,
+//     totalBet: initialPotAmount,
+//     pots: null,
+//     status: 'in-progress',
+//     rounds: [{
+//       name: 'pre-flop',
+//       bettingRoundStartedAt: new Date(),
+//       actions: [
+//         { userId: activePlayers[0].userId, action: 'small-blind', amount: smallBlindAmount, timestamp: new Date()},
+//         { userId: activePlayers[1].userId, action: 'big-blind', amount: bigBlindAmount, timestamp: new Date() },
+//       ],
+//     }],
+//     communityCards: [],
+//     createdAt: new Date(),
+//     updatedAt: new Date(),
+//   };
+
+//   // Update the poker desk with the new game
+//   this.currentGame = newGame;
+//   this.currentGameStatus = 'in-progress';
+
+//   // Deduct balances in seats and remove players below the minimum buy-in
+//   this.seats.forEach((seat: ISeat, index: number) => {
+//     const matchingPlayer = activePlayers.find((player:IPlayer) => player.userId.equals(seat.userId));
+//     if (matchingPlayer) {
+//       seat.balanceAtTable = matchingPlayer.balanceAtTable;
+//     } else if (seat.balanceAtTable < this.minBuyIn) {
+//       this.seats.splice(index, 1); // Remove player from the seat
+//     }
+//   });
+
+//   await this.save();
+//   return newGame;
+// };
+
+
 PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerGame> {
-  // Check if a current game already exists and if it's finished
+  // Ensure there is no active unfinished game
   if (this.currentGame && this.currentGame.status !== 'finished') {
     throw new Error('There is already an active game.');
   }
 
-  // Filter and set up active players from seats, ensuring they meet the min buy-in
+  // Filter active players meeting the minimum buy-in
   const activePlayers = this.seats
     .filter((seat: ISeat) => seat.userId && seat.status === 'active' && seat.balanceAtTable >= this.minBuyIn)
-    .map((seat:ISeat) => ({
+    .map((seat: ISeat) => ({
       userId: seat.userId!,
       balanceAtTable: seat.balanceAtTable,
       status: 'active',
       totalBet: 0,
       holeCards: [],
       role: 'player',
-    }));
-
+    })); 
   if (activePlayers.length < 2) {
     throw new Error('Not enough active players to start a game.');
   }
+ 
+  // Determine game rules based on game type
+  let holeCardsCount = 2; // Default for NLH
+  let blindType = 'blind';
+  let anteAmount = this.stake; // Default no ante
+  let smallBlindAmount = this.stake;
+  let bigBlindAmount = 2 * this.stake;
 
-  // Assign roles: small blind (SB) and big blind (BB)
-  activePlayers[0].role = 'sb';
-  activePlayers[1].role = 'bb';
+  switch (this.gameType) {
+    case 'NLH':
+      holeCardsCount = 2; // No Limit Hold'em
+      break;
+    case 'PLO4':
+      holeCardsCount = 4; // Pot Limit Omaha (4 hole cards)
+      break;
+    case 'PLO5':
+      holeCardsCount = 5; // Pot Limit Omaha (5 hole cards)
+      break;
+    case 'STUD':
+    case 'RAZZ':
+      smallBlindAmount = 0;
+      bigBlindAmount = 0; 
+      break;
+    default:
+      throw new Error('Unsupported game type.');
+  }
+  
+ 
+ 
+  // Set roles for SB and BB if applicable
+  if (blindType === 'blind') {
+    activePlayers[0].role = 'sb';
+    activePlayers[1].role = 'bb';
+    activePlayers[0].totalBet = smallBlindAmount;
+    activePlayers[1].totalBet = bigBlindAmount;
+    activePlayers[0].balanceAtTable -= smallBlindAmount;
+    activePlayers[1].balanceAtTable -= bigBlindAmount;
+  }
 
-  // Set SB and BB bet amounts
-  const smallBlindAmount = 1;
-  const bigBlindAmount = 2;
-  activePlayers[0].totalBet = smallBlindAmount;
-  activePlayers[1].totalBet = bigBlindAmount;
-  activePlayers[0].balanceAtTable -= smallBlindAmount;
-  activePlayers[1].balanceAtTable -= bigBlindAmount;
+  // Apply ante to all players if applicable
+  if (blindType === 'ante') {
+    activePlayers.forEach((player: IPlayer) => {
+      player.balanceAtTable -= anteAmount;
+      player.totalBet += anteAmount;
+    });
+  }
 
-  // Initialize the pot with SB and BB
-  const initialPotAmount = smallBlindAmount + bigBlindAmount;
+  // Calculate initial pot
+  const initialPotAmount = activePlayers.reduce((total: any, player: { totalBet: any; }) => total + player.totalBet, 0);
+
+  // Create a deck and deal hole cards
   const deck: ICard[] = generateDeck();
-
-  // Deal hole cards to each player
-  activePlayers.forEach((player : IPlayer) => {
-    player.holeCards = [deck.pop()!, deck.pop()!];
+  activePlayers.forEach((player: IPlayer) => {
+    player.holeCards = Array.from({ length: holeCardsCount }, () => deck.pop()!);
   });
+ 
 
   // Create a new game object
-  const newGame : RPokerGame  = {
+  const newGame: RPokerGame = {
     players: activePlayers,
-    currentTurnPlayer: activePlayers[2]?.userId || activePlayers[0].userId,
+    currentTurnPlayer: activePlayers[blindType === 'blind' ? 2 : 0]?.userId || activePlayers[0].userId,
     totalBet: initialPotAmount,
     pots: null,
     status: 'in-progress',
     rounds: [{
       name: 'pre-flop',
       bettingRoundStartedAt: new Date(),
-      actions: [
-        { userId: activePlayers[0].userId, action: 'small-blind', amount: smallBlindAmount, timestamp: new Date()},
-        { userId: activePlayers[1].userId, action: 'big-blind', amount: bigBlindAmount, timestamp: new Date() },
-      ],
+      actions: blindType === 'blind'
+        ? [
+          { userId: activePlayers[0].userId, action: 'small-blind', amount: smallBlindAmount, timestamp: new Date() },
+          { userId: activePlayers[1].userId, action: 'big-blind', amount: bigBlindAmount, timestamp: new Date() },
+        ]
+        : activePlayers.map((player: IPlayer) => ({
+          userId: player.userId,
+          action: 'ante',
+          amount: anteAmount,
+          timestamp: new Date(),
+        })),
     }],
     communityCards: [],
     createdAt: new Date(),
@@ -469,7 +699,7 @@ PokerDeskSchema.methods.createGameFromTable = async function (): Promise<RPokerG
 
   // Deduct balances in seats and remove players below the minimum buy-in
   this.seats.forEach((seat: ISeat, index: number) => {
-    const matchingPlayer = activePlayers.find((player:IPlayer) => player.userId.equals(seat.userId));
+    const matchingPlayer = activePlayers.find((player: IPlayer) => player.userId.equals(seat.userId));
     if (matchingPlayer) {
       seat.balanceAtTable = matchingPlayer.balanceAtTable;
     } else if (seat.balanceAtTable < this.minBuyIn) {
@@ -752,8 +982,6 @@ PokerDeskSchema.methods.handlePlayerAction = async function (userId: mongoose.Ty
   return newAction;
 };
 
-
-
 PokerDeskSchema.methods.showdown = async function () {
 
   if (!this.currentGame || this.currentGame.status !== 'in-progress') {
@@ -771,7 +999,7 @@ PokerDeskSchema.methods.showdown = async function () {
   
   const gamePots = createPots(this.currentGame.rounds)
   // Evaluate pots and determine winners
-  const potResults = evaluatePots(this.currentGame.players, this.currentGame.communityCards, gamePots);
+  const potResults = evaluatePots(this.currentGame.players, this.currentGame.communityCards, gamePots, this.gameType);
   // Save the evaluated pot results to the current game
   this.currentGame.pots = potResults;
   // Process each pot to distribute winnings
@@ -814,7 +1042,7 @@ PokerDeskSchema.methods.showdown = async function () {
 
   for (const player of this.currentGame.players) {
     if (player.status === 'disconnected') {
-      console.log("living seat get called ",player.userId);
+      
       await this.userLeavesSeat(player.userId);
     }
   }
