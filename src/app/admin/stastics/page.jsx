@@ -2,14 +2,26 @@
 'use client'
 import { useEffect, useState } from 'react';
 import { HomeIcon, UserIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/outline';
+import LatestGameHistory from '../../../components/admin/latestGameHistory';
 import dynamic from 'next/dynamic';
-
+import React from 'react';
+ import LeaderBoard  from '../../../components/admin/LeaderBoard'
+import LatestPlayers from '../../../components/admin/LatestPlayers'
+import GameUsage from '../../../components/admin/gameUsage'
+import BankTransactionOverview from '../../../components/admin/BankTransactionOverview'
+import BankStats from '../../../components/admin/BankStats'
+import UserStats from '../../../components/admin/UserStats'
+import GameStats from '../../../components/admin/GameStats'
+// import Chart from 'react-apexcharts';
 // Dynamically import Chart for client-side only
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+ 
+
 
 const Dashboard = () => {
   const [data, setData] = useState(null);
-
+  const [loading, setLoading ] = useState(false);
+  const [users, setUsers ] = useState([]);
   // Fetch data from the API
   useEffect(() => {
     const fetchData = async () => {
@@ -19,6 +31,39 @@ const Dashboard = () => {
       setData(result.data);
     };
     fetchData();
+
+    const fetchUsers = async () => {
+     // setLoading(true);
+      try {
+        const response = await axios.get('/api/admin/auth/users');
+        setUsers(response.data.users);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+       // setLoading(false);
+      }
+    };
+    fetchUsers();
+
+
+    const fetchGameData = async () => {
+      try {
+          const response = await axios.get('/api/admin/auth/getGamesList', {
+              params: {
+                  pageNo,
+                  itemsPerPage, 
+              }
+          });
+          setData(response.data.data);
+          setTotalPages(response.data.totalPages);
+      } catch (error) {
+          console.error("Failed to fetch data:", error);
+      }
+     };
+
+    
+    fetchGameData();
+
   }, []);
 
   if (!data) {
@@ -31,13 +76,14 @@ const Dashboard = () => {
 
   // Statistics Data
   const { userStats, bankTransactionStats, pokerGameStats } = data;
-
+  
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Users Stats */}
-        
-        <div className="bg-white p-6 rounded-lg shadow-md">
+
+      
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        {/* User Stats */}
+        {/* <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex items-center space-x-4">
             <UserIcon className="h-8 w-8 text-blue-500" />
             <div>
@@ -59,10 +105,12 @@ const Dashboard = () => {
               <span>{userStats.suspendedUsers}</span>
             </div>
           </div>
-        </div>
-
+        </div> */}
+        {userStats && <UserStats userStats={userStats} /> }
+      { bankTransactionStats &&  <BankStats bankTransactionStats={bankTransactionStats} /> }
+       { pokerGameStats && <GameStats pokerGameStats={pokerGameStats} /> }
         {/* Bank Transaction Stats */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        {/* <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex items-center space-x-4">
             <CurrencyDollarIcon className="h-8 w-8 text-green-500" />
             <div>
@@ -84,67 +132,17 @@ const Dashboard = () => {
               <span>{bankTransactionStats.totalWithdrawFailed}</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Poker Game Stats */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center space-x-4">
-            <ClockIcon className="h-8 w-8 text-purple-500" />
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">Poker Game Stats</h2>
-              <p className="text-sm text-gray-500">Active Poker Games: {pokerGameStats.totalActivePokerGames}</p>
-            </div>
+             
+
           </div>
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Finished Poker Games:</span>
-              <span>{pokerGameStats.totalFinishedPokerGames}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Pot in Active Games:</span>
-              <span>₹{pokerGameStats.totalPotInActiveGames}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Top Players by Total Bet:</span>
-              <span>{pokerGameStats.topPlayersByTotalBet.length}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Chart for Total Deposit vs Total Withdraw */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold text-gray-800">Bank Transaction Overview</h2>
-        {typeof window !== 'undefined' && (
-          <Chart
-            options={{
-              chart: { type: 'bar' },
-              xaxis: { categories: ['Deposit', 'Withdraw'] },
-            }}
-            series={[
-              {
-                name: 'Successful',
-                data: [
-                  bankTransactionStats.totalDepositSuccessful,
-                  bankTransactionStats.totalWithdrawSuccessful,
-                ],
-              },
-              {
-                name: 'Failed',
-                data: [
-                  bankTransactionStats.totalDepositFailed,
-                  bankTransactionStats.totalWithdrawFailed,
-                ],
-              },
-            ]}
-            type="bar"
-            height={350}
-          />
-        )}
-      </div>
 
       {/* Top Players By Total Bet */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
+      {/* <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold text-gray-800">Top Players by Total Bet</h2>
         <table className="min-w-full mt-4 table-auto">
           <thead>
@@ -162,10 +160,33 @@ const Dashboard = () => {
             ))}
           </tbody>
         </table>
+      </div> */}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-5">
+        {/* Left Column: Latest Players and Latest Game History */}
+        <div className="lg:col-span-2 space-y-6">
+         { data.userStats.topNewUsers && <LatestPlayers players={data.userStats.topNewUsers} /> }
+          {/* <LatestGameHistory /> */}
+          <LatestGameHistory/>
+        </div>
+
+        {/* Right Column: Leaderboard and Game Usage */}
+        <div className="space-y-6">
+          { data.pokerGameStats.topPlayersByTotalBet && <LeaderBoard topPlayers = {data.pokerGameStats.topPlayersByTotalBet}/> }
+          {  
+          data.userStats.totalUsers && data.userStats.deviceTypeStats && <GameUsage totalUsers={data.userStats.totalUsers} deviceTypeStats={data.userStats.deviceTypeStats} />
+        }
+        </div>
+      </div>
+
+      <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
+
+      {bankTransactionStats &&  <BankTransactionOverview stats={bankTransactionStats}/> }
       </div>
     </div>
   );
 };
+
 
 export default Dashboard;
 

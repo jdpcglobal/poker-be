@@ -11,10 +11,11 @@
   "dependencies": {
     "@heroicons/react": "^1.0.6",
     "@types/mongoose": "^5.11.97",
-    "apexcharts": "^4.2.0",
+    "apexcharts": "^4.3.0",
     "axios": "^1.7.6",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
+    "chart.js": "^4.4.7",
     "date-fns": "^4.1.0",
     "jose": "^5.9.6",
     "js-cookie": "^3.0.5",
@@ -23,7 +24,8 @@
     "next": "14.2.7",
     "pokersolver": "^2.1.4",
     "react": "^18",
-    "react-apexcharts": "^1.6.0",
+    "react-apexcharts": "^1.7.0",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5"

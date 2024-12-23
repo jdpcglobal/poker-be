@@ -1022,17 +1022,23 @@ PokerDeskSchema.methods.showdown = async function () {
 
   const archivedGame = new PokerGameArchive({
     deskId: this._id, // Assuming this is the desk's ID
+    stack: this.stack, // Add stack from the current context
+    bType : this.bType,
+    mode : this.mode,
+    deskName : this.tableName,
+    gameType: this.gameType, // Add gameType (ensure it's sourced correctly)
     players: this.currentGame.players,
     currentTurnPlayer: this.currentGame.currentTurnPlayer,
-    pot: this.currentGame.totalBet,
+    totalBet: this.currentGame.totalBet, // Add totalBet from the current game's context
     status: 'finished',
     rounds: this.currentGame.rounds,
     communityCards: this.currentGame.communityCards,
-    pots: potResults,
-  });
+    pots: potResults, // Assuming potResults is calculated elsewhere
+});
+
   
   await archivedGame.save();
-
+  console.log("archivedGame",archivedGame);
   // Set the current game status to finished
   this.currentGame.status = 'finished';
    this.currentGame.pots = potResults;

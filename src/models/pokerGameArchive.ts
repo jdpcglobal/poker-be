@@ -51,10 +51,46 @@ const PotSchema = new Schema({
 // Define the Archive Schema
 const PokerGameArchiveSchema = new Schema({
     deskId: { type: Schema.Types.ObjectId, ref: 'PokerDesk', required: true },
+    deskName : { 
+        type: String,
+        default : 'LETKNOW',
+        required: true,
+    },
+    stack : { type: Number, default: 0 },
+    mode: {
+        type: String,
+        enum: ['practice', 'cash'],
+        default: 'cash',
+        required: true,
+    },
+    bType: {
+        type: String,
+        enum: ['blinds', 'antes','both'],
+        required: true,
+    },  
+    gameType: {
+        type: String,
+        enum: [
+          'NLH',       // No Limit Hold'em
+          'PLO4',      // Pot Limit Omaha (4 cards)
+          'PLO5',      // Pot Limit Omaha (5 cards)
+          'OmahaHILO', // High-Low split games (e.g., Omaha Hi-Lo)
+          'SDH',       // Short Deck Hold'em
+          'STUD',      // Seven Card Stud
+          'RAZZ',      // Razz (lowball)
+          'PINEAPPLE', // Pineapple Poker
+          'COURCHEVEL',// Courchevel Poker
+          '5CD',       // Five Card Draw
+          'BADUGI',    // Badugi Poker
+          'MIXED',     // Mixed Games (e.g., H.O.R.S.E)
+        ],
+        default : 'NLH',
+        required: true,
+    },
     players: [PlayerSchema],
     currentTurnPlayer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    pot: { type: Number, default: 0 },
-    status: { type: String, enum: ['waiting', 'in-progress', 'finished'], default: 'waiting' },
+    totalBet: { type: Number, default: 0 },
+    status: { type: String, enum: ['waiting', 'in-progress', 'finished'], default: 'finished' },
     rounds: [RoundSchema],
     communityCards: [{
         suit: { type: String, enum: ['hearts', 'diamonds', 'clubs', 'spades'] },

@@ -1,5 +1,6 @@
 import dbConnect from '@/config/dbConnect';
-import BankTransaction from '@/models/bankTransaction'; // Import the BankTransaction model
+import BankTransaction from '../../../models/bankTransaction';
+import BankAccount from '../../../models/bankAccount';
 import { verifyToken } from '@/utils/jwt'; // Import your JWT verification function
 
 export default async function handler(req, res) {
