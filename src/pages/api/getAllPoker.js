@@ -85,8 +85,8 @@
 
 
 import dbConnect from '@/config/dbConnect';
-import Poker from '../../models/Poker';
-import PokerMode from '../../models/PokerMode';
+import Poker from '../../models/poker';
+import PokerMode from '../../models/pokerMode';
 import PokerDesk from '../../models/pokerDesk'; // Assuming this model exists
 import { verifyToken } from '../../utils/jwt';
 
