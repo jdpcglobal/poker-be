@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     // Send OTP via third-party API
     try {
       await sendOtpToMobile(mobileNumber, otpRecord.otp); // Implement the third-party API call
-      return res.status(200).json({ message: 'OTP sent successfully', otp: otpRecord.otp });
+      return res.status(200).json({ message: 'OTP sent successfully'});
     } catch (error) {
       console.error('Error sending OTP:', error);
       return res.status(500).json({ message: 'Failed to send OTP', error: error.message });

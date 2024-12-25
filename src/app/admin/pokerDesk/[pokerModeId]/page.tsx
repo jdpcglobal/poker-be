@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
 import Link from 'next/link';
+import LatestGameHistory from '@/components/admin/latestGameHistory';
 
 interface Seat {
   seatNumber: number;
@@ -380,6 +381,8 @@ const PokerDeskAdmin: React.FC = () => {
           </div>
         </div>
       )}
+
+    { pokerModeId &&  <LatestGameHistory pokerModeId={pokerModeId} />}
     </div>
   );
 };
