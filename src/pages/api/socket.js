@@ -294,8 +294,9 @@ async function handlePlayerActionAndSendGame(io, tableId, userId, action, amount
           clearTimeout(activeTimers[tableId]);
           delete activeTimers[tableId];
         }
-        await sendSeatDataAfterGame(io,tableId);
+       
         await sendResultData(io,tableId);
+        await sendSeatDataAfterGame(io,tableId);
       }else{
         const nextPlayerId = pokerGameSend.currentTurnPlayer;
         if (nextPlayerId) {
