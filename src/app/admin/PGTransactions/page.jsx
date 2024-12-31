@@ -101,7 +101,7 @@ const PMGTransactions = () => {
         <tbody className="text-gray-700 text-sm font-light">
           {transactions && transactions.map((transaction) => (
             <tr key={transaction._id} className="border-b border-gray-200 hover:bg-gray-100">
-              <td className="py-3 px-6">{transaction.userId.username}</td>
+              <td className="py-3 px-6">{transaction.userId?.username}</td>
               <td className="py-3 px-6">{transaction.orderId || 'N/A'}</td>
               <td className="py-3 px-6">{transaction.amount.toLocaleString()}</td>
               <td className="py-3 px-6">{transaction.currency}</td>

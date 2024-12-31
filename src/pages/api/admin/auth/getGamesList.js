@@ -240,7 +240,7 @@ export default async function handler(req, res) {
             .exec();
 
         const formattedData = pokerGameArchives.map(archive => {
-            console.log("archive   1",archive);
+      
             return {
                 gameArchiveId: archive._id,
                 tableId: archive.deskId,

@@ -8,7 +8,7 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
 export default async function handler(req, res) {
 
-    console.log("hiii, ",req.body)
+    // console.log("hiii, ",req.body)
   await dbConnect();
 
   if (req.method !== 'POST') {

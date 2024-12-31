@@ -3,40 +3,51 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
+
 interface IBankTransaction {
   _id: string;
   userId: { username: string; mobileNumber: string };
   amount: number;
   type: 'deposit' | 'withdraw';
-  status: 'failed' | 'completed' | 'successful' | 'waiting';
+  status: 'failed' | 'completed' | 'waiting' | 'successful';
   bankId: { bankName: string; accountHolderName: string };
   remark: string;
+  createdOn: string;
 }
 
 const BankTransactions = () => {
   const [transactions, setTransactions] = useState<IBankTransaction[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [filters, setFilters] = useState({
+    bankId: '',
+    username: '',
+    status: '',
+    type: '',
+    maxAmount: '',
+    sortByDate: 'desc', // Default sort by descending date
+  });
   const itemsPerPage = 10;
 
   useEffect(() => {
-
     const fetchTransactions = async () => {
-      
       try {
-         // Replace 'token' with your actual cookie name
         const response = await axios.get('/api/admin/auth/getBankTransactions', {
-          params: { page, limit: itemsPerPage }, 
+          params: { 
+            page, 
+            limit: itemsPerPage, 
+            ...filters,
+          },
         });
         setTransactions(response.data.transactions);
-        setTotalPages(Math.ceil(response.data.totalCount / itemsPerPage));
+        setTotalPages(Math.ceil(response.data.totalCounts / itemsPerPage));
       } catch (error) {
         console.error('Error fetching transactions:', error);
       }
     };
 
     fetchTransactions();
-  }, [page]);
+  }, [page, filters]);
 
   const changeTransactionStatus = async (transactionId: string, newStatus: 'failed' | 'completed' | 'successful' | 'waiting') => {
     try {
@@ -57,9 +68,77 @@ const BankTransactions = () => {
     }
   };
 
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
   return (
     <div className="p-8 bg-white shadow-lg rounded-lg">
       <h2 className="text-2xl font-semibold mb-6 text-gray-700">Bank Transactions</h2>
+
+      {/* Filters */}
+      <div className="mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <input
+            type="text"
+            name="username"
+            placeholder="Search by Username"
+            className="border p-2 rounded-md"
+            value={filters.username}
+            onChange={handleFilterChange}
+          />
+          <input
+            type="text"
+            name="bankId"
+            placeholder="Search by Bank ID"
+            className="border p-2 rounded-md"
+            value={filters.bankId}
+            onChange={handleFilterChange}
+          />
+          <select
+            name="status"
+            className="border p-2 rounded-md"
+            value={filters.status}
+            onChange={handleFilterChange}
+          >
+            <option value="">All Statuses</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="waiting">Waiting</option>
+            <option value="successful">Successful</option>
+          </select>
+          <select
+            name="type"
+            className="border p-2 rounded-md"
+            value={filters.type}
+            onChange={handleFilterChange}
+          >
+            <option value="">All Types</option>
+            <option value="deposit">Deposit</option>
+            <option value="withdraw">Withdraw</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <input
+            type="number"
+            name="maxAmount"
+            placeholder="Max Amount"
+            className="border p-2 rounded-md"
+            value={filters.maxAmount}
+            onChange={handleFilterChange}
+          />
+          <select
+            name="sortByDate"
+            className="border p-2 rounded-md"
+            value={filters.sortByDate}
+            onChange={handleFilterChange}
+          >
+            <option value="desc">Sort by Date (Newest First)</option>
+            <option value="asc">Sort by Date (Oldest First)</option>
+          </select>
+        </div>
+      </div>
 
       <table className="min-w-full bg-white border border-gray-200 rounded-lg">
         <thead className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">

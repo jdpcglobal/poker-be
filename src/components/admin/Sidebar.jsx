@@ -55,9 +55,9 @@ const Sidebar = () => {
     </Link>
   </li>
   <li>
-    <Link href="/admin/settings" className="flex items-center space-x-2 hover:bg-gray-700 p-2 rounded">
+    <Link href="/admin/PGTransactions" className="flex items-center space-x-2 hover:bg-gray-700 p-2 rounded">
       <CogIcon className="h-6 w-6" />
-      {!collapsed && <span>Settings</span>}
+      {!collapsed && <span> PG Transactions</span>}
     </Link>
   </li>
 </ul>
