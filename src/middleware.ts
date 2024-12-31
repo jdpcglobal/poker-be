@@ -12,23 +12,20 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const res = NextResponse.next();
   const isPrivatePath = path.startsWith('/admin'); // Path that requires authentication
- 
-
   // Check if token is present
  if(isPrivatePath || path === '/auth/login' ){ 
-
-  console.log("isPrivatePath",isPrivatePath);
+ console.log("hii how are you it is not the",2345);
   const token = req.cookies.get('token')?.value || '';
-  console.log('Middleware path:', req.nextUrl.pathname);
+   
   if (token) {
     try {
       // Verify the token
       const { payload } = await jwtVerify(token, secret);
-      console.log('Decoded JWT payload:', payload);
+    
 
       // Check if token contains required fields (userId, role, etc.)
-      if (!payload.userId || !payload.role) {
-        console.log('Incomplete token payload, redirecting to login...');
+      if (!payload.userId || !payload.role) { 
+
         // If payload is missing key fields, redirect to login
         if (path !== '/auth/login') {
           return NextResponse.redirect(new URL('/auth/login', req.url));
@@ -61,8 +58,7 @@ export async function middleware(req: NextRequest) {
   }
  }
  else if(path === '/api/socket'){ 
-  const origin = req.headers.get('origin');
-  console.log("CORS middleware triggered for /api/socket");
+  const origin = req.headers.get('origin'); 
 
   // Allow CORS for all origins
   res.headers.append('Access-Control-Allow-Origin', '*');

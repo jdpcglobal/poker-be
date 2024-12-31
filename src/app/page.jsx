@@ -1,7 +1,7 @@
 'use client';
 import useSocket from '../hooks/useSocket';
 import { useEffect, useState } from 'react';
-
+import { useRouter } from 'next/navigation';
 export default function Home() {
   const socket = useSocket("yatodharm tato jayah");
   const [logs, setLogs] = useState([]);
@@ -9,8 +9,10 @@ export default function Home() {
   const [currentVersion, setCurrentVersion] = useState("Version 1.4.0 - Bug fixes");
   const [versionDetails, setVersionDetails] = useState("");
   const [randomCode, setRandomCode] = useState("");
-
+ const router = useRouter();
+ router.push("/auth/login");
   useEffect(() => {
+    
     // Simulate receiving logs
     const interval = setInterval(() => {
       setLogs((prevLogs) => [
