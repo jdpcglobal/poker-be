@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint"
   },
+  
   "dependencies": {
     "@heroicons/react": "^1.0.6",
     "@types/mongoose": "^5.11.97",
