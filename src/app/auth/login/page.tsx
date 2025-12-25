@@ -26,7 +26,7 @@ export default function Login() {
                 router.push('/admin/stastics');
             }
         } catch (err) {
-            setError('Failed to login. Please check your credentials.');
+            setError('Failed to login. Please check your credentials.',err);
             console.error(err);
         } finally {
             setLoading(false); // Set loading to false when the request completes
