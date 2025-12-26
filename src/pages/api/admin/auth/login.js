@@ -23,10 +23,10 @@ export default async function handler(req, res) {
       if (!admin) {
         return res.status(401).json({ error: 'Invalid credentials.' });
       }
-      
+      const pw=await bcrypt.hash(admin.password,10);
       console.log("admin is here",admin);
       console.log("admin id is here ",admin._id);
-      console.log("admin is mobile here",admin.password);
+      console.log("admin is mobile here",pw);
       // Check if the admin's password exists before comparing
       // if (!admin.password) {
       //   return res.status(500).json({ error: 'User does not have a password set.' });
