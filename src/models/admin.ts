@@ -1,80 +1,99 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
-import bcrypt from 'bcryptjs';  // Import bcrypt for password hashing
+/**
+ * @fileoverview Admin Model
+ * Handles admin account authentication. Separate from User by design (different
+ * auth method, different data, different lifecycle — see TASKS.md for the rationale).
+ *
+ * Auth: email + password (bcrypt). JWT is delivered to the browser via an
+ * httpOnly cookie, never stored in the database.
+ */
 
-// Define the TypeScript interface for the Admin document
-interface IAdmin extends Document {
+import mongoose, { Schema, Document, Model } from 'mongoose';
+import bcrypt from 'bcryptjs';
+
+export interface IAdmin {
   name: string;
+  email: string;
   mobile: string;
-  token?: string; // Token is optional
+  password: string;
+  role: 'admin';
   status: 'active' | 'inactive';
-  role: 'superadmin' | 'editor' | 'viewer'; // Different roles for admin
-  lastLogin?: Date | null; // lastLogin is optional and can be null
-  email?: string; // Email is optional
-  password: string; // Password is required
-  createdAt?: Date;
-  updatedAt?: Date;
+  lastLogin: Date | null;
 }
 
-// Define the schema for the Admin model
-const AdminSchema: Schema<IAdmin> = new Schema(
+export interface IAdminDocument extends IAdmin, Document {
+  comparePassword(candidatePassword: string): Promise<boolean>;
+}
+
+const AdminSchema = new Schema<IAdminDocument>(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, 'Name is required'],
       trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, 'Email is required'],
+      unique: true, // builds its own index
+      trim: true,
+      lowercase: true,
+      validate: {
+        validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: (props: { value: string }) =>
+          `${props.value} is not a valid email address`,
+      },
     },
     mobile: {
       type: String,
-      required: true,
-      unique: true,
+      required: [true, 'Mobile number is required'],
+      unique: true, // builds its own index
+      validate: {
+        validator: (v: string) => /^[0-9]{10}$/.test(v),
+        message: (props: { value: string }) =>
+          `${props.value} is not a valid 10-digit mobile number`,
+      },
     },
-    token: {
+    password: {
       type: String,
-      default: '', // Set a default value for token
+      required: [true, 'Password is required'],
+      minlength: [8, 'Password must be at least 8 characters'],
+    },
+    role: {
+      type: String,
+      enum: ['admin'],
+      default: 'admin',
     },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      required: true,
-    },
-    role: {
-      type: String,
-      enum: ['superadmin', 'editor', 'viewer'], // Enum to allow only specified roles
-      default: 'editor',
     },
     lastLogin: {
       type: Date,
-      default: null, // Initialized as null until the first login
-    },
-    email: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-    },
-    password: {
-      type: String,
-      required: true, // Password is required
-      minlength: 6, // Password length validation
+      default: null,
     },
   },
   {
-    timestamps: true, // Automatically handles createdAt and updatedAt
+    timestamps: true,
   }
 );
 
-// Hash the password before saving the admin document
-AdminSchema.pre<IAdmin>('save', async function (next) {
-  if (this.isModified('password')) {
-    // Hash password before saving if it is modified or new
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-  }
+/** Hash the password on save when it has been set or changed. */
+AdminSchema.pre<IAdminDocument>('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Create the Admin model if it doesn’t already exist
-const Admin: Model<IAdmin> = mongoose.models.Admin || mongoose.model<IAdmin>('Admin', AdminSchema);
+/** Constant-time-ish password check via bcrypt. */
+AdminSchema.methods.comparePassword = async function (
+  candidatePassword: string
+): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+const Admin: Model<IAdminDocument> =
+  mongoose.models.Admin || mongoose.model<IAdminDocument>('Admin', AdminSchema);
 
 export default Admin;

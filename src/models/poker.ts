@@ -1,78 +1,153 @@
-// models/Poker.ts
-import mongoose, { Document, Schema } from 'mongoose';
+/**
+ * @fileoverview Poker Model
+ * Defines the supported poker game types available on the platform.
+ * Each game type can have multiple modes (PokerMode) with different stakes.
+ * This is a small reference/config model — no money fields, no currency.
+ */
 
-interface IPoker extends Document {
-  name: string; 
-  objective: string;
-  rules: Map<string, string>;
+import mongoose, { Schema, Document, Model } from 'mongoose';
+
+/**
+ * Supported poker game types.
+ *
+ * NOTE (2026-06-01 LOGS.md): scope narrowed from five game types to two
+ * (Hold'em + Omaha) for this rebuild. Stud / Razz / Five-Card Draw were
+ * declared in the original union but never had correct first-actor logic
+ * in the engine (they require card-based bring-in, not position-based
+ * blinds rotation). Rather than ship a playable-but-incorrect game,
+ * they're removed from both the type union and the runtime enum.
+ *
+ * They come back in a future major version of the application (NOT a
+ * later phase of this rebuild). When re-introduced, the design needs
+ * per-game first-actor rules in the engine BEFORE adding the type back.
+ * See LOGS.md 2026-06-01 for the full reasoning and the Five-Card-Draw
+ * blinds-vs-antes ambiguity that needs deciding then.
+ *
+ * The `bType` field on PokerMode/PokerDesk and the `'antes'` branch in
+ * gameEngine.initializeGameState are deliberately preserved as forward-
+ * compatible dead code so the future re-introduction doesn't require
+ * schema-level migration.
+ */
+export type PokerGameType =
+  | "Texas Hold'em"
+  | 'Omaha';
+
+export type PokerStatus = 'active' | 'maintenance' | 'disabled';
+
+export interface IPoker {
+  gameType: PokerGameType;
   description?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  status: 'active' | 'maintenance' | 'disable';
-  gameType: 'NLH' | 'PLO4' | 'PLO5' | 'OmahaHILO' | 'SDH' | 'STUD' | 'RAZZ' | 'PINEAPPLE' | 'COURCHEVEL' | '5CD' | 'BADUGI' | 'MIXED';
-  
+  objective?: string;
+  status: PokerStatus;
 }
 
-const pokerSchema: Schema = new Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-  },
-  objective: {
-    type: String,
-    default: 'Make the best 5-card hand',
-  },
-  rules: {
-    type: Map,
-    of: String,
-    default: {},
-  },
-  description: {
-    type: String,
-    trim: true,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-  status: {
-    type: String, // 'active', 'maintenance', or 'notactive'
-    enum: ['active', 'maintenance', 'disable'],
-    default: 'active', // Default to 'active'
-  },
-  gameType: {
-    type: String,
-    enum: [
-      'NLH',       // No Limit Hold'em
-      'PLO4',      // Pot Limit Omaha (4 cards)
-      'PLO5',      // Pot Limit Omaha (5 cards)
-      'OmahaHILO', // High-Low split games (e.g., Omaha Hi-Lo)
-      'SDH',       // Short Deck Hold'em
-      'STUD',      // Seven Card Stud
-      'RAZZ',      // Razz (lowball)
-      'PINEAPPLE', // Pineapple Poker
-      'COURCHEVEL',// Courchevel Poker
-      '5CD',       // Five Card Draw
-      'BADUGI',    // Badugi Poker
-      'MIXED',     // Mixed Games (e.g., H.O.R.S.E)
-    ],
-    default : 'NLH',
-    required: true,
-  },
-});
+export interface IPokerDocument extends IPoker, Document {}
 
-// Middleware to update the 'updatedAt' field
-pokerSchema.pre<IPoker>('save', function (next) {
-  this.updatedAt = new Date(); // Convert to Date object
-  next();
-});
+const PokerSchema = new Schema<IPokerDocument>(
+  {
+    gameType: {
+      type: String,
+      enum: [
+        "Texas Hold'em",
+        'Omaha',
+      ],
+      required: [true, 'Game type is required'],
+      unique: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    objective: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'maintenance', 'disabled'],
+      default: 'active',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-const Poker = mongoose.models.Poker || mongoose.model<IPoker>('Poker', pokerSchema);
+PokerSchema.index({ status: 1 });
+
+const Poker: Model<IPokerDocument> =
+  mongoose.models.Poker ||
+  mongoose.model<IPokerDocument>('Poker', PokerSchema);
 
 export default Poker;
+// /**
+//  * @fileoverview Poker Model
+//  * Defines the supported poker game types available on the platform.
+//  * Each game type can have multiple modes (PokerMode) with different stakes.
+//  * This is a small reference/config model — no money fields, no currency.
+//  */
+
+// import mongoose, { Schema, Document, Model } from 'mongoose';
+
+// export type PokerGameType =
+//   | "Texas Hold'em"
+//   | 'Omaha'
+//   | 'Seven-Card Stud'
+//   | 'Razz'
+//   | 'Five-Card Draw';
+
+// export type PokerStatus = 'active' | 'maintenance' | 'disabled';
+
+// export interface IPoker {
+//   gameType: PokerGameType;
+//   description?: string;
+//   objective?: string;
+//   status: PokerStatus;
+// }
+
+// export interface IPokerDocument extends IPoker, Document {}
+
+// const PokerSchema = new Schema<IPokerDocument>(
+//   {
+//     gameType: {
+//       type: String,
+//       enum: [
+//         "Texas Hold'em",
+//         'Omaha',
+//         'Seven-Card Stud',
+//         'Razz',
+//         'Five-Card Draw',
+//       ],
+//       required: [true, 'Game type is required'],
+//       unique: true,
+//     },
+//     description: {
+//       type: String,
+//       trim: true,
+//       default: null,
+//     },
+//     objective: {
+//       type: String,
+//       trim: true,
+//       default: null,
+//     },
+//     status: {
+//       type: String,
+//       enum: ['active', 'maintenance', 'disabled'],
+//       default: 'active',
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// PokerSchema.index({ status: 1 });
+
+// const Poker: Model<IPokerDocument> =
+//   mongoose.models.Poker ||
+//   mongoose.model<IPokerDocument>('Poker', PokerSchema);
+
+// export default Poker;

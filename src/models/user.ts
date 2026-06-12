@@ -1,93 +1,156 @@
+/**
+ * @fileoverview User Model
+ * Handles user identity. Authentication is provider-based (currently Google only;
+ * the structure is designed so future providers — Apple, Facebook, mobile-OTP — can
+ * be added by inserting an authProviders entry, with no schema migration).
+ *
+ * Identity rules:
+ *   - googleId is found inside authProviders (provider='google', providerId=googleId).
+ *   - email is globally unique (one account per email).
+ *   - mobileNumber is OPTIONAL contact info only — not used for auth, not unique.
+ *   - username is auto-generated unique on first login; user may change it once during
+ *     onboarding, after which usernameLocked=true and it becomes permanent.
+ */
 
-import { IUser, IWallet, IWalletTransaction, IAmountBreakdown } from '@/utils/pokerModelTypes';
-import mongoose, { Schema, Model, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
-const AmountBreakdownSchema : Schema<IAmountBreakdown> = new Schema({
-  cashAmount: { type: Number, default: 0 }, // Cash portion of the transaction
-  instantBonus: { type: Number, default: 0 }, // Instant bonus portion
-  lockedBonus: { type: Number, default: 0 }, // Locked bonus portion
-  gst: { type: Number, default: 0 }, // GST portion
-  tds: { type: Number, default: 0 }, // TDS deductions
-  otherDeductions: { type: Number, default: 0 }, // Additional deductions, if any
-  total: { type: Number, required: true }, // Total transaction amount
-});
+export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type DeviceType = 'android' | 'ios' | 'unknown';
+export type AuthProviderName = 'google';
 
+/**
+ * One linked external auth account. Today only 'google' is supported.
+ * The (provider, providerId) pair is GLOBALLY unique (enforced by a compound index
+ * on authProviders.provider + authProviders.providerId) so the same Google account
+ * cannot be attached to two users.
+ */
+export interface IAuthProvider {
+  provider: AuthProviderName;
+  /** The provider's stable id for this user (e.g. Google's `sub` claim). */
+  providerId: string;
+  /** Email reported by the provider at link time — informational, may go stale. */
+  email?: string;
+  linkedAt: Date;
+}
 
-const WalletTransactionSchema: Schema<IWalletTransaction> = new Schema({
-  createdOn: { type: Date, default: Date.now },
-  completedOn: { type: Date },
-  status: { type: String, enum: ['failed', 'completed', 'pending'], required: true },
-  amount: { type: AmountBreakdownSchema, required: true }, // Nested breakdown for amounts
-  type: {
-    type: String,
-    enum: ['deposit', 'withdraw', 'deskIn', 'deskWithdraw', 'bonus', 'pgDeposit'],
-    required: true,
-  },
-  remark: { type: String },
-  DeskId: { type: mongoose.Schema.Types.ObjectId, ref: 'PokerDesk' },
-  BankTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'BankTransaction' },
-  pmgtId : { type: mongoose.Schema.Types.ObjectId, ref: 'PmgTransaction' },
-});
+export interface IUser {
+  email: string;
+  username: string;
+  usernameLocked: boolean;
+  status: UserStatus;
+  deviceType: DeviceType;
+  /** Optional contact number; not used for auth, not unique. */
+  mobileNumber?: string;
+  authProviders: IAuthProvider[];
+  lastLogin: Date | null;
+}
 
-const WalletSchema: Schema<IWallet> = new Schema({
-  balance: { type: Number, default: 0, min: 0 },
-  instantBonus: { type: Number, default: 0, min: 0 },
-  lockedBonus: { type: Number, default: 0 },
-  transactions: [WalletTransactionSchema],
-});
+export interface IUserDocument extends IUser, Document {}
 
-const UserSchema: Schema<IUser> = new Schema({
-  mobileNumber: {
-    type: String,
-    required: true,
-    unique: true,
-    validate: {
-      validator: (v: string) => /^[0-9]{10}$/.test(v),
-      message: (props: { value: string }) => `${props.value} is not a valid mobile number!`,
+const AuthProviderSchema = new Schema<IAuthProvider>(
+  {
+    provider: {
+      type: String,
+      enum: ['google'],
+      required: true,
+    },
+    providerId: {
+      type: String,
+      required: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+    linkedAt: {
+      type: Date,
+      default: Date.now,
     },
   },
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    minlength: 3,
-    maxlength: 30,
-  },  
-  registrationDate: { type: Date, default: Date.now },
-  lastLogin: { type: Date, default: Date.now },
-  isActive: { type: Boolean, default: true },
-  status: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' },
-  wallet: { type: WalletSchema, default: () => ({}) },
-  deviceInfo: { type: String },
-  ipAddress: { type: String },
-  deviceType: { type: String, default: 'android' },
-  latitude: { type: Number },
-  longitude: { type: Number },
-});
+  { _id: false }
+);
 
-UserSchema.methods.updateLastLogin = async function (req: any): Promise<void> {
-  this.lastLogin = new Date();
+const UserSchema = new Schema<IUserDocument>(
+  {
+    email: {
+      type: String,
+      required: [true, 'Email is required'],
+      unique: true, // one account per email — builds its own index
+      trim: true,
+      lowercase: true,
+      validate: {
+        validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: (props: { value: string }) =>
+          `${props.value} is not a valid email address`,
+      },
+    },
+    username: {
+      type: String,
+      required: [true, 'Username is required'],
+      unique: true, // builds its own index
+      trim: true,
+      minlength: [3, 'Username must be at least 3 characters'],
+      maxlength: [30, 'Username cannot exceed 30 characters'],
+    },
+    usernameLocked: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive', 'suspended'],
+      default: 'active',
+    },
+    deviceType: {
+      type: String,
+      enum: ['android', 'ios', 'unknown'],
+      default: 'unknown',
+    },
+    mobileNumber: {
+      type: String,
+      default: null,
+      validate: {
+        // Optional, but if provided must be a 10-digit number.
+        validator: (v: string | null) => v === null || v === undefined || /^[0-9]{10}$/.test(v),
+        message: (props: { value: string }) =>
+          `${props.value} is not a valid 10-digit mobile number`,
+      },
+    },
+    authProviders: {
+      type: [AuthProviderSchema],
+      default: [],
+      validate: {
+        // Every user must have at least one linked provider — they can't exist otherwise.
+        validator: (arr: IAuthProvider[]) => arr.length >= 1,
+        message: 'User must have at least one linked auth provider',
+      },
+    },
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-  // Access headers directly
-  this.deviceInfo = req.headers['user-agent'] || 'Unknown device'; // Access 'user-agent' directly
-  this.ipAddress = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'Unknown IP'; // Access 'x-forwarded-for' directly
+/**
+ * Global uniqueness of (provider, providerId): the same external account
+ * (e.g. a given Google id) cannot be linked to two different users. MongoDB
+ * enforces this across all documents when the index is on an array subfield.
+ */
+UserSchema.index(
+  { 'authProviders.provider': 1, 'authProviders.providerId': 1 },
+  { unique: true }
+);
 
-  // Assert req.body type to avoid ReadableStream errors
-  const body = req.body as { latitude?: number; longitude?: number; deviceType?: string };
+UserSchema.index({ status: 1 });
 
-  this.deviceType = body.deviceType || 'android'; // Default to 'android' if not provided
-  this.latitude = body.latitude ?? null; // Use null if latitude is missing
-  this.longitude = body.longitude ?? null; // Use null if longitude is missing
-  await this.save();
-};
-
-UserSchema.methods.toggleActiveStatus = async function (): Promise<void> {
-  this.isActive = !this.isActive;
-  await this.save();
-};
-
-
-const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+const User: Model<IUserDocument> =
+  mongoose.models.User ||
+  mongoose.model<IUserDocument>('User', UserSchema);
 
 export default User;
-

@@ -1,107 +1,177 @@
-// models/PokerGameArchive.js
+/**
+ * @fileoverview Poker Game Archive Model
+ * Records completed poker games for admin analytics and user game history.
+ * Hand history is intentionally excluded (too large, unused). If needed later,
+ * it should be a separate collection.
+ *
+ * All money (stacks, bets, pots, winnings) is INTEGER minor units (paise/cents).
+ * username on players and winners is REQUIRED; the showdown logic in pokerDesk.ts
+ * resolves real usernames before creating an archive (see task 0.8).
+ */
 
-import mongoose, { Schema } from 'mongoose';
-import {
-    IPlayer,
-    IRound
-} from '../utils/pokerModelTypes'; 
+import mongoose, { Schema, Document, Model } from 'mongoose';
+import { PokerGameType } from '@/models/poker';
+import { ModeType } from '@/models/pokerDesk';
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY, Currency } from '@/config/constants';
 
-const PlayerSchema = new Schema<IPlayer>({
-    userId: { type: Schema.Types.ObjectId, ref: 'User' },
-    balanceAtTable: { type: Number, default: 0 },
-    status: { type: String, enum: ['active', 'all-in', 'folded', 'sitting-out'], default: 'active' },
-    totalBet: { type: Number, default: 0 },
-    holeCards: [{
-        suit: { type: String, enum: ['hearts', 'diamonds', 'clubs', 'spades'] },
-        rank: { type: String, enum: ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] }
-    }],
-    role: { type: String, enum: ['sb', 'bb', 'player'], default: 'player' }
-}, { _id: false });
-  
-// Define Round schema
-const RoundSchema = new Schema<IRound>({
-    name: { type: String, enum: ['pre-flop', 'flop', 'turn', 'river', 'showdown'] },
-    bettingRoundStartedAt: { type: Date, default: Date.now },
-    actions: [{
-        userId: { type: Schema.Types.ObjectId, ref: 'User' },
-        action: { type: String, enum: ['fold', 'check', 'call', 'raise', 'all-in', 'small-blind', 'big-blind'] },
-        amount: { type: Number, default: 0 },
-        timestamp: { type: Date, default: Date.now }
-    }]
-}, { _id: false });
-  
-const PotSchema = new Schema({
-    amount: { type: Number, required: true, default: 0 }, // Total amount in the pot
-    contributors: [
-        {
-            playerId: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // The ID of the player contributing to the pot
-            contribution: { type: Number, required: true, default: 0 }, // The amount contributed by the player
-        },
-    ],
-    winners: [
-        {
-            playerId: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // The ID of the player contributing to the pot
-            amount: { type: Number, required: true, default: 0 }, // The amount contributed by the player
-        },
-    ],
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
-});
+export interface IGamePlayer {
+  userId: mongoose.Types.ObjectId;
+  username: string;
+  seatNumber: number;
+  /** Stack at the start of the game, minor units. */
+  startingStack: number;
+  /** Stack at the end of the game, minor units. */
+  endingStack: number;
+  /** Total amount this player bet across the game, minor units. */
+  totalBet: number;
+  isWinner: boolean;
+}
 
-// Define the Archive Schema
-const PokerGameArchiveSchema = new Schema({
-    deskId: { type: Schema.Types.ObjectId, ref: 'PokerDesk', required: true },
-    deskName : { 
-        type: String,
-        default : 'LETKNOW',
-        required: true,
+export interface IPotWinner {
+  playerId: mongoose.Types.ObjectId;
+  username: string;
+  /** Amount won from this pot, minor units. */
+  amount: number;
+  handDescription: string;
+}
+
+export interface IGamePot {
+  potNumber: number;
+  /** Total size of this pot, minor units. */
+  totalAmount: number;
+  winners: IPotWinner[];
+}
+
+export interface IPokerGameArchive {
+  deskId: mongoose.Types.ObjectId;
+  pokerModeId: mongoose.Types.ObjectId;
+  gameType: PokerGameType;
+  currency: Currency;
+  mode: ModeType;
+  players: IGamePlayer[];
+  pots: IGamePot[];
+  /** Total pot across the whole game, minor units. */
+  totalPot: number;
+  startedAt: Date;
+  completedAt: Date;
+}
+
+export interface IPokerGameArchiveDocument extends IPokerGameArchive, Document {}
+
+const GamePlayerSchema = new Schema<IGamePlayer>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    username: { type: String, required: true },
+    seatNumber: { type: Number, required: true },
+    startingStack: { type: Number, required: true, min: 0 },
+    endingStack: { type: Number, required: true, min: 0 },
+    totalBet: { type: Number, required: true, min: 0 },
+    isWinner: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const PotWinnerSchema = new Schema<IPotWinner>(
+  {
+    playerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    username: { type: String, required: true },
+    amount: { type: Number, required: true, min: 0 },
+    handDescription: { type: String, trim: true, default: null },
+  },
+  { _id: false }
+);
+
+const GamePotSchema = new Schema<IGamePot>(
+  {
+    potNumber: { type: Number, required: true },
+    totalAmount: { type: Number, required: true, min: 0 },
+    winners: { type: [PotWinnerSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const PokerGameArchiveSchema = new Schema<IPokerGameArchiveDocument>(
+  {
+    deskId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PokerDesk',
+      required: [true, 'Desk ID is required'],
+      index: true,
     },
-    stack : { type: Number, default: 0 },
-    mode: {
-        type: String,
-        enum: ['practice', 'cash'],
-        default: 'cash',
-        required: true,
+    pokerModeId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PokerMode',
+      required: [true, 'Poker mode ID is required'],
+      index: true,
     },
-    bType: {
-        type: String,
-        enum: ['blinds', 'antes','both'],
-        required: true,
-    },  
     gameType: {
-        type: String,
-        enum: [
-          'NLH',       // No Limit Hold'em
-          'PLO4',      // Pot Limit Omaha (4 cards)
-          'PLO5',      // Pot Limit Omaha (5 cards)
-          'OmahaHILO', // High-Low split games (e.g., Omaha Hi-Lo)
-          'SDH',       // Short Deck Hold'em
-          'STUD',      // Seven Card Stud
-          'RAZZ',      // Razz (lowball)
-          'PINEAPPLE', // Pineapple Poker
-          'COURCHEVEL',// Courchevel Poker
-          '5CD',       // Five Card Draw
-          'BADUGI',    // Badugi Poker
-          'MIXED',     // Mixed Games (e.g., H.O.R.S.E)
-        ],
-        default : 'NLH',
-        required: true,
+      type: String,
+      enum: [
+        "Texas Hold'em",
+        'Omaha',
+        'Seven-Card Stud',
+        'Razz',
+        'Five-Card Draw',
+      ],
+      required: [true, 'Game type is required'],
     },
-    players: [PlayerSchema],
-    currentTurnPlayer: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    totalBet: { type: Number, default: 0 },
-    status: { type: String, enum: ['waiting', 'in-progress', 'finished'], default: 'finished' },
-    rounds: [RoundSchema],
-    communityCards: [{
-        suit: { type: String, enum: ['hearts', 'diamonds', 'clubs', 'spades'] },
-        rank: { type: String, enum: ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] }
-    }],
-    pots: { type: [PotSchema], default: [] },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    currency: {
+      type: String,
+      enum: SUPPORTED_CURRENCIES,
+      default: DEFAULT_CURRENCY,
+      required: true,
+    },
+    mode: {
+      type: String,
+      enum: ['cash', 'practice'],
+      required: true,
+    },
+    players: { type: [GamePlayerSchema], default: [] },
+    pots: { type: [GamePotSchema], default: [] },
+    totalPot: { type: Number, required: true, min: 0, default: 0 },
+    startedAt: { type: Date, required: true },
+    completedAt: { type: Date, required: true },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+/**
+ * Guard: all money fields (across nested players/pots/winners) must be whole
+ * minor units. Protects the analytics/history surfaces from float corruption.
+ */
+PokerGameArchiveSchema.pre('save', function (next) {
+  if (!Number.isInteger(this.totalPot)) {
+    return next(new Error(`PokerGameArchive.totalPot must be an integer (minor units); got ${this.totalPot}`));
+  }
+  for (const p of this.players) {
+    for (const f of ['startingStack', 'endingStack', 'totalBet'] as const) {
+      if (!Number.isInteger(p[f])) {
+        return next(new Error(`PokerGameArchive player.${f} must be an integer (minor units); got ${p[f]}`));
+      }
+    }
+  }
+  for (const pot of this.pots) {
+    if (!Number.isInteger(pot.totalAmount)) {
+      return next(new Error(`PokerGameArchive pot.totalAmount must be an integer (minor units); got ${pot.totalAmount}`));
+    }
+    for (const w of pot.winners) {
+      if (!Number.isInteger(w.amount)) {
+        return next(new Error(`PokerGameArchive winner.amount must be an integer (minor units); got ${w.amount}`));
+      }
+    }
+  }
+  next();
 });
 
-// Create the Archive Model
-const PokerGameArchive = mongoose.models.PokerGameArchive || mongoose.model('PokerGameArchive', PokerGameArchiveSchema);
+PokerGameArchiveSchema.index({ 'players.userId': 1, completedAt: -1 });
+PokerGameArchiveSchema.index({ deskId: 1, completedAt: -1 });
+PokerGameArchiveSchema.index({ pokerModeId: 1, completedAt: -1 });
+PokerGameArchiveSchema.index({ gameType: 1, completedAt: -1 });
+
+const PokerGameArchive: Model<IPokerGameArchiveDocument> =
+  mongoose.models.PokerGameArchive ||
+  mongoose.model<IPokerGameArchiveDocument>('PokerGameArchive', PokerGameArchiveSchema);
 
 export default PokerGameArchive;
