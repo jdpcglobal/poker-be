@@ -149,6 +149,8 @@ async function evictBotsIfNoHumans(deskId: string): Promise<IPokerDeskDocument |
 
   desk.seats = [] as unknown as typeof desk.seats;
   desk.status = 'closed';
+  desk.currentGame = null;
+  desk.currentGameStatus = 'finished';
   await desk.save();
   await Bot.deleteMany({ deskId });
   return desk;
