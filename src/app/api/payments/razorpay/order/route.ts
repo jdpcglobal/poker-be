@@ -11,15 +11,20 @@ import GatewayTransaction from '@/models/gatewayTransaction';
 
 // Module-level instance — created once and reused across requests.
 // Empty strings are safe defaults; the handler validates env vars before use.
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID ?? '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET ?? '',
-});
+// const razorpay = new Razorpay({
+//   key_id: process.env.RAZORPAY_KEY_ID ?? '',
+//   key_secret: process.env.RAZORPAY_KEY_SECRET ?? '',
+// });
 
 export async function POST(req: NextRequest) {
   try {
     const { userId } = requireUser(req);
     await dbConnect();
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID ?? '',
+      key_secret: process.env.RAZORPAY_KEY_SECRET ?? '',
+    });
 
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
       throw new ServiceError('RAZORPAY_NOT_CONFIGURED', 'Payment gateway is not configured');
