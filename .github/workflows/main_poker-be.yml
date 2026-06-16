@@ -24,6 +24,21 @@ jobs:
           node-version: '22.x'
 
       - name: npm install, build, and test
+        env:
+          # NEXT_PUBLIC_* vars are baked into the build at compile time on
+          # this runner -- Azure App Service's Application Settings are
+          # runtime-only and never reach this step. See docs/LOGS.md
+          # 2026-06-16 (poker repo) for the matching bug found on the
+          # Static Web App deploy.
+          # Self-fetch base URL used by src/lib/admin/fetchAdmin.ts.
+          NEXT_PUBLIC_BASE_URL: "https://poker-be.azurewebsites.net"
+          # CORS origin for the socket.io server (src/socketServer.ts). Now
+          # that Next.js and Socket.io share one process (task 7.0), this is
+          # the same host as the API itself.
+          NEXT_PUBLIC_APP_URL: "https://poker-be.azurewebsites.net"
+          # Client-side socket connection target (src/hooks/useSocket.ts).
+          # Same host -- the engine now lives inside this exact deployment.
+          NEXT_PUBLIC_SOCKET_URL: "https://poker-be.azurewebsites.net"
         run: |
           npm install
           npm run build --if-present

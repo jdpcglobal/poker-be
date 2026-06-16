@@ -1,8 +1,6 @@
-import { createServer } from 'http';
+import type { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { Types } from 'mongoose';
-
-import dbConnect from '@/config/dbConnect';
 import { verifyToken } from '@/utils/jwt';
 import {
   addUserToSeat,
@@ -37,7 +35,7 @@ interface DeskRuntimeState {
 
 const deskRuntime = new Map<string, DeskRuntimeState>();
 
-const httpServer = createServer();
+export function attachSocketServer(httpServer: HttpServer): void {
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.NEXT_PUBLIC_APP_URL ?? '*',
@@ -783,16 +781,4 @@ io.on('connection', (socket) => {
     }
   });
 });
-
-const port = parseInt(process.env.SOCKET_PORT ?? '3001', 10);
-
-dbConnect()
-  .then(() => {
-    httpServer.listen(port, () => {
-      console.log(`[socket] server running on port ${port}`);
-    });
-  })
-  .catch((err) => {
-    console.error('[socket] failed to connect to database:', err);
-    process.exit(1);
-  });
+}

@@ -3,11 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev:next": "next dev",
-    "dev:engine": "tsx --env-file=.env src/server.ts",
-    "dev": "concurrently \"npm run dev:next\" \"npm run dev:engine\"",
+    "dev": "tsx --env-file=.env.local server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "tsx server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
