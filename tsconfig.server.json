@@ -15,5 +15,5 @@
     "outDir": ".",
     "paths": {}
   },
-  "include": ["server.ts"]
+  "files": ["server.ts"]
 }
