@@ -1,7 +1,9 @@
 import { createServer } from 'http';
 import next from 'next';
-import dbConnect from '@/config/dbConnect';
-import { attachSocketServer } from '@/socketServer';
+//import dbConnect from '@/config/dbConnect';
+//import { attachSocketServer } from '@/socketServer';
+import dbConnect from './src/config/dbConnect';
+import { attachSocketServer } from './src/socketServer';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT ?? '3000', 10);
