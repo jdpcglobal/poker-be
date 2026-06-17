@@ -13,7 +13,10 @@
     "incremental": false,
     "target": "ES2017",
     "outDir": ".",
-    "paths": {}
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "files": ["server.ts"]
 }
