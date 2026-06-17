@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx --env-file=.env.local server.ts",
+    "dev": "node node_modules/tsx/dist/cli.mjs server.ts",
     "build": "next build",
-    "start": "node node_modules/tsx/dist/cli.mjs server.ts",
+    "start": "node server.js"
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
