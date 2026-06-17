@@ -38,11 +38,12 @@ jobs:
           path: |
             .next/
             public/
+            src/
             package.json
             package-lock.json
             server.js
-            next.config.js
-            node_modules/
+            next.config.mjs
+            tsconfig.json
           # 👆 Only upload what's needed, not entire repo
 
   deploy:
