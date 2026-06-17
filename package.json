@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node node_modules/tsx/dist/cli.mjs server.ts",
     "build": "next build",
-    "start": "node server.js"
+    "start": "node server.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
