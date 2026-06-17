@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx --env-file=.env.local server.ts",
     "build": "next build",
-    "start": "tsx server.ts",
+    "start": "node node_modules/tsx/dist/cli.mjs server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
