@@ -40,6 +40,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: node-app
+          include-hidden-files: true
           path: |
             .next/
             public/
@@ -50,6 +51,12 @@ jobs:
             server.ts
             next.config.mjs
             tsconfig.json
+          # include-hidden-files is required: upload-artifact@v4 excludes
+          # dotfiles/dot-directories by default, which silently strips the
+          # entire .next build output (and node_modules/.bin) since both
+          # start with a dot. Without this flag the deploy "succeeds" but
+          # ships an empty/missing .next, causing Next's "Could not find a
+          # production build" error at boot.
           # node_modules is included because SCM_DO_BUILD_DURING_DEPLOYMENT=false
           # (.deployment file) means Azure will NOT run npm install itself --
           # the artifact must be fully self-contained. server.ts (not
