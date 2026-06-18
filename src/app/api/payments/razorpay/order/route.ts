@@ -9,26 +9,22 @@ import { parseAmount } from '@/lib/api/money';
 import { ServiceError } from '@/services/gameService';
 import GatewayTransaction from '@/models/gatewayTransaction';
 
-// Module-level instance — created once and reused across requests.
-// Empty strings are safe defaults; the handler validates env vars before use.
-// const razorpay = new Razorpay({
-//   key_id: process.env.RAZORPAY_KEY_ID ?? '',
-//   key_secret: process.env.RAZORPAY_KEY_SECRET ?? '',
-// });
-
 export async function POST(req: NextRequest) {
   try {
     const { userId } = requireUser(req);
     await dbConnect();
 
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID ?? '',
-      key_secret: process.env.RAZORPAY_KEY_SECRET ?? '',
-    });
+    const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
 
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    if (!razorpayKeyId || !razorpayKeySecret) {
       throw new ServiceError('RAZORPAY_NOT_CONFIGURED', 'Payment gateway is not configured');
     }
+
+    const razorpay = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
 
     const body = await req.json().catch(() => ({}));
     const parsedAmount = parseAmount((body as { amount?: unknown }).amount, DEFAULT_CURRENCY);
@@ -58,7 +54,7 @@ export async function POST(req: NextRequest) {
         // Razorpay checkout SDK, which requires the minor-unit integer.
         amount: parsedAmount,
         currency: DEFAULT_CURRENCY,
-        keyId: process.env.RAZORPAY_KEY_ID,
+        keyId: razorpayKeyId,
       },
       201
     );

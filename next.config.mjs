@@ -5,11 +5,6 @@ const nextConfig = {
         // your project has ESLint errors.
         ignoreDuringBuilds: true,
       },
-    experimental: {
-    // force all routes to be dynamic
-  },
-  // This makes all routes dynamic by default
-  staticPageGenerationTimeout: 0,
 };
 
 export default nextConfig;

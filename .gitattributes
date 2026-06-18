@@ -1,0 +1,10 @@
+# Normalize line endings to LF for files that matter to Linux-based tooling
+# (GitHub Actions runs on ubuntu-latest; CRLF inside a multi-line `run:`
+# block can break shell execution there). Without this, Windows editors/
+# GitHub Desktop can silently reintroduce CRLF on save.
+
+* text=auto eol=lf
+
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf

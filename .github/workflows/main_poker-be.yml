@@ -28,7 +28,7 @@ jobs:
         run: |
           npm install
           npm run build
-          # 👇 Compile server.ts → server.js
+          # Compile server.ts to server.js
           npx tsc --project tsconfig.server.json
 
       - name: Upload artifact for deployment job
@@ -44,7 +44,7 @@ jobs:
             server.js
             next.config.mjs
             tsconfig.json
-          # 👆 Only upload what's needed, not entire repo
+          # Only upload what's needed, not entire repo
 
   deploy:
     runs-on: ubuntu-latest
