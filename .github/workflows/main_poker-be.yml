@@ -28,11 +28,12 @@ jobs:
         run: |
           npm install
           npm run build
-          # Compile server.ts to server.js
-          npx tsc --project tsconfig.server.json
+          # server.ts runs directly via tsx at runtime (see start script) --
+          # no separate compile step. tsx resolves @/ aliases live, same as
+          # local dev, so the whole import graph (socketServer, gameService,
+          # models, engine) works without any path rewriting.
           # Strip devDependencies (typescript, eslint, tailwindcss, postcss,
-          # @types/*) now that build/compile is done -- they are not needed
-          # at runtime and only bloat the deployed artifact.
+          # @types/*) now that next build is done -- not needed at runtime.
           npm prune --omit=dev
 
       - name: Upload artifact for deployment job
@@ -46,12 +47,13 @@ jobs:
             node_modules/
             package.json
             package-lock.json
-            server.js
+            server.ts
             next.config.mjs
             tsconfig.json
           # node_modules is included because SCM_DO_BUILD_DURING_DEPLOYMENT=false
           # (.deployment file) means Azure will NOT run npm install itself --
-          # the artifact must be fully self-contained.
+          # the artifact must be fully self-contained. server.ts (not
+          # server.js) is shipped since it's run directly via tsx.
 
   deploy:
     runs-on: ubuntu-latest
