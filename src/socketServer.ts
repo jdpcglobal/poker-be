@@ -16,6 +16,7 @@ import { addBotToSeat } from '@/services/botService';
 import { getBotStrategy } from '@/lib/bots/index';
 import PokerDesk from '@/models/pokerDesk';
 import type { IPokerDeskDocument } from '@/models/pokerDesk';
+import User from '@/models/user';
 import PracticeSession from '@/models/practiceSession';
 import Bot from '@/models/bot';
 import { PRACTICE_STARTING_CHIPS } from '@/config/constants';
@@ -75,30 +76,79 @@ function getOrCreateRuntime(deskId: string): DeskRuntimeState {
   return runtime;
 }
 
-// Produces a plain desk object with holeCards stripped from every player.
-// This is the shape sent on every room broadcast — hole cards are NEVER leaked.
-function redactDesk(desk: IPokerDeskDocument): Record<string, unknown> {
+/**
+ * Builds a userId -> username map for every userId present on a desk
+ * (seats + currentGame.players). Resolves human users via User.find and
+ * bots via Bot.find in two parallel queries. Falls back to 'unknown' if
+ * a record is missing (should never happen in normal flow).
+ */
+async function buildUsernameMap(
+  desk: IPokerDeskDocument
+): Promise<Map<string, string>> {
+  const allUserIds = new Set<string>();
+  for (const s of desk.seats) allUserIds.add(s.userId.toString());
+  if (desk.currentGame) {
+    for (const p of desk.currentGame.players) allUserIds.add(p.userId.toString());
+  }
+
+  const ids = Array.from(allUserIds).map((id) => new Types.ObjectId(id));
+
+  const [userDocs, botDocs] = await Promise.all([
+    User.find({ _id: { $in: ids } }).select('username').lean<{ _id: Types.ObjectId; username: string }[]>(),
+    Bot.find({ deskId: desk._id }).lean<{ botId: Types.ObjectId; botName: string }[]>(),
+  ]);
+
+  const map = new Map<string, string>();
+  for (const u of userDocs) map.set(u._id.toString(), u.username);
+  for (const b of botDocs) map.set(b.botId.toString(), b.botName);
+  return map;
+}
+
+/**
+ * Produces a plain desk object safe for room broadcast:
+ *   - holeCards stripped from every player (never leaked).
+ *   - username injected into every seat and every currentGame player.
+ *
+ * Requires an already-resolved usernameMap to stay synchronous at the
+ * call site — callers must await buildUsernameMap first.
+ */
+function redactAndEnrichDesk(
+  desk: IPokerDeskDocument,
+  usernameMap: Map<string, string>
+): Record<string, unknown> {
   const obj = desk.toObject() as Record<string, unknown> & {
+    seats?: Array<Record<string, unknown> & { userId: unknown }>;
     currentGame?: {
-      players?: Array<Record<string, unknown>>;
+      players?: Array<Record<string, unknown> & { userId: unknown }>;
     } | null;
   };
+
+  if (obj.seats) {
+    obj.seats = obj.seats.map((s) => ({
+      ...s,
+      username: usernameMap.get(s.userId?.toString() ?? '') ?? 'unknown',
+    }));
+  }
+
   if (obj.currentGame?.players) {
     obj.currentGame.players = obj.currentGame.players.map((p) => ({
       ...p,
       holeCards: [],
+      username: usernameMap.get(p.userId?.toString() ?? '') ?? 'unknown',
     }));
   }
+
   return obj;
 }
 
-function broadcastDeskState(
+async function broadcastDeskState(
   deskId: string,
   event: string,
   desk: IPokerDeskDocument,
   extraPayload?: Record<string, unknown>
-): void {
-  io.to(deskId).emit(event, { desk: redactDesk(desk), ...extraPayload });
+): Promise<void> {
+  const usernameMap = await buildUsernameMap(desk);
+  io.to(deskId).emit(event, { desk: redactAndEnrichDesk(desk, usernameMap), ...extraPayload });
 }
 
 function targetedEmit(
@@ -184,9 +234,9 @@ function startTurnTimer(deskId: string, userId: string): void {
         deskRuntime.get(deskId)?.skipCounts.delete(userId);
         if (result.needsShowdown) { await handleNeedsShowdown(deskId); return; }
         if (result.progression === 'nextRound') {
-          broadcastDeskState(deskId, 'game:roundAdvance', result.desk);
+          await broadcastDeskState(deskId, 'game:roundAdvance', result.desk);
         } else {
-          broadcastDeskState(deskId, 'game:action', result.desk);
+          await broadcastDeskState(deskId, 'game:action', result.desk);
         }
         const game = result.desk.currentGame;
         if (game) {
@@ -232,9 +282,9 @@ function startTurnTimer(deskId: string, userId: string): void {
         await handleNeedsShowdown(deskId);
         if (!deskRuntime.has(deskId)) return; // desk closed during showdown
       } else if (foldResult.progression === 'nextRound') {
-        broadcastDeskState(deskId, 'game:roundAdvance', foldResult.desk);
+        await broadcastDeskState(deskId, 'game:roundAdvance', foldResult.desk);
       } else {
-        broadcastDeskState(deskId, 'game:action', foldResult.desk);
+        await broadcastDeskState(deskId, 'game:action', foldResult.desk);
         const game = foldResult.desk.currentGame;
         if (game) {
           const active = game.players.filter((p) => p.status === 'active').length;
@@ -269,7 +319,7 @@ function startTurnTimer(deskId: string, userId: string): void {
           }
         }
 
-        broadcastDeskState(deskId, 'player:left', evictDesk);
+        await broadcastDeskState(deskId, 'player:left', evictDesk);
         const nextTurn = evictDesk.currentGame?.currentTurnPlayer;
         const rt = deskRuntime.get(deskId);
         if (nextTurn && rt && !rt.turnTimer) {
@@ -281,7 +331,7 @@ function startTurnTimer(deskId: string, userId: string): void {
         } else {
           const closedDesk = await evictBotsIfNoHumans(deskId);
           if (closedDesk) {
-            broadcastDeskState(deskId, 'player:left', closedDesk);
+            await broadcastDeskState(deskId, 'player:left', closedDesk);
             io.to(deskId).emit('desk:closed', {});
             rt?.botSeats.clear();
             deskRuntime.delete(deskId);
@@ -298,9 +348,9 @@ function startTurnTimer(deskId: string, userId: string): void {
       }
 
       if (foldResult.progression === 'nextRound') {
-        broadcastDeskState(deskId, 'game:roundAdvance', foldResult.desk);
+        await broadcastDeskState(deskId, 'game:roundAdvance', foldResult.desk);
       } else {
-        broadcastDeskState(deskId, 'game:action', foldResult.desk);
+        await broadcastDeskState(deskId, 'game:action', foldResult.desk);
       }
 
       const game = foldResult.desk.currentGame;
@@ -331,7 +381,7 @@ async function handleNeedsShowdown(deskId: string): Promise<void> {
   }
 
   const { desk, potResults } = await showdown({ deskId });
-  broadcastDeskState(deskId, 'game:showdown', desk, {
+  await broadcastDeskState(deskId, 'game:showdown', desk, {
     potResults: potResults.map((pr) => ({
       ...pr,
       winners: pr.winners.map((w) => ({ ...w, userId: w.userId.toString() })),
@@ -343,7 +393,7 @@ async function handleNeedsShowdown(deskId: string): Promise<void> {
   } else {
     const closedDesk = await evictBotsIfNoHumans(deskId);
     if (closedDesk) {
-      broadcastDeskState(deskId, 'player:left', closedDesk);
+      await broadcastDeskState(deskId, 'player:left', closedDesk);
       io.to(deskId).emit('desk:closed', {});
       runtime?.botSeats.clear();
       deskRuntime.delete(deskId);
@@ -360,7 +410,7 @@ async function handleAllInRunout(deskId: string): Promise<void> {
     const updatedDesk = await advanceGameRound(deskId);
     const lastRound = updatedDesk.currentGame?.rounds.at(-1);
     if (!lastRound || lastRound.name === 'showdown') break;
-    broadcastDeskState(deskId, 'game:roundAdvance', updatedDesk);
+    await broadcastDeskState(deskId, 'game:roundAdvance', updatedDesk);
   }
   await handleNeedsShowdown(deskId);
 }
@@ -386,7 +436,7 @@ function scheduleAutoStart(deskId: string, delayMs = 3000): void {
             runtime.botSeats.delete(uid);
             await Bot.deleteOne({ deskId, botId: new Types.ObjectId(uid) });
             if (needsShowdown) { await handleNeedsShowdown(deskId); return; }
-            broadcastDeskState(deskId, 'player:left', updated);
+            await broadcastDeskState(deskId, 'player:left', updated);
             const nextTurn = updated.currentGame?.currentTurnPlayer;
             const rt = deskRuntime.get(deskId);
             if (nextTurn && rt && !rt.turnTimer) startTurnTimer(deskId, nextTurn.toString());
@@ -402,7 +452,7 @@ function scheduleAutoStart(deskId: string, delayMs = 3000): void {
 
       // Redacted broadcast first, then targeted hole cards to each player.
       const desk = await createGame({ deskId });
-      broadcastDeskState(deskId, 'game:start', desk);
+      await broadcastDeskState(deskId, 'game:start', desk);
       const game = desk.currentGame;
       if (game) {
         for (const player of game.players) {
@@ -480,7 +530,7 @@ io.on('connection', (socket) => {
         const refreshedDesk = await PokerDesk.findById(deskId);
         if (!refreshedDesk) return;
 
-        broadcastDeskState(deskId, 'player:joined', refreshedDesk);
+        await broadcastDeskState(deskId, 'player:joined', refreshedDesk);
 
         // Re-send hole cards if a game is in progress.
         const game = refreshedDesk.currentGame;
@@ -507,7 +557,7 @@ io.on('connection', (socket) => {
       const runtime = getOrCreateRuntime(deskId);
       runtime.userSockets.set(userId, socket.id);
 
-      broadcastDeskState(deskId, 'player:joined', desk);
+      await broadcastDeskState(deskId, 'player:joined', desk);
 
       // Cold desk: gate is minToStart. Warm desk (firstGameStartedAt set): gate is minToContinue.
       const threshold = desk.firstGameStartedAt ? desk.minToContinue : desk.minToStart;
@@ -557,9 +607,9 @@ io.on('connection', (socket) => {
       }
 
       if (progression === 'nextRound') {
-        broadcastDeskState(deskId, 'game:roundAdvance', desk);
+        await broadcastDeskState(deskId, 'game:roundAdvance', desk);
       } else {
-        broadcastDeskState(deskId, 'game:action', desk);
+        await broadcastDeskState(deskId, 'game:action', desk);
       }
 
       // All-in runout: if no one can bet but multiple players are all-in, run out the board.
@@ -638,7 +688,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      broadcastDeskState(deskId, 'player:left', desk);
+      await broadcastDeskState(deskId, 'player:left', desk);
       const nextTurn = desk.currentGame?.currentTurnPlayer;
       const rt = deskRuntime.get(deskId);
       if (nextTurn && rt && !rt.turnTimer) {
@@ -651,7 +701,7 @@ io.on('connection', (socket) => {
       } else {
         const closedDesk = await evictBotsIfNoHumans(deskId);
         if (closedDesk) {
-          broadcastDeskState(deskId, 'player:left', closedDesk);
+          await broadcastDeskState(deskId, 'player:left', closedDesk);
           io.to(deskId).emit('desk:closed', {});
           rt?.botSeats.clear();
           deskRuntime.delete(deskId);
@@ -676,11 +726,23 @@ io.on('connection', (socket) => {
         socket.emit('error', { code: 'DESK_NOT_FOUND', message: 'Desk not found' });
         return;
       }
+
+      // Resolve usernames for the seat map so the seat-picker UI can show names.
+      const seatUserIds = desk.seats.map((s) => new Types.ObjectId(s.userId.toString()));
+      const [userDocs, botDocs] = await Promise.all([
+        User.find({ _id: { $in: seatUserIds } }).select('username').lean<{ _id: Types.ObjectId; username: string }[]>(),
+        Bot.find({ deskId: desk._id }).lean<{ botId: Types.ObjectId; botName: string }[]>(),
+      ]);
+      const nameMap = new Map<string, string>();
+      for (const u of userDocs) nameMap.set(u._id.toString(), u.username);
+      for (const b of botDocs) nameMap.set(b.botId.toString(), b.botName);
+
       socket.emit('desk:seats', {
         deskId,
         seats: desk.seats.map((s) => ({
           seatNumber: s.seatNumber,
           userId: s.userId.toString(),
+          username: nameMap.get(s.userId.toString()) ?? 'unknown',
           status: s.status,
         })),
         maxSeats: desk.maxSeats,
@@ -745,7 +807,7 @@ io.on('connection', (socket) => {
       });
       runtime.practiceSessions.set(userId, session._id.toString());
 
-      broadcastDeskState(deskId, 'player:joined', latestDesk);
+      await broadcastDeskState(deskId, 'player:joined', latestDesk);
 
       // Auto-start check — same threshold logic as the join handler.
       const threshold = latestDesk.firstGameStartedAt
@@ -761,7 +823,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // On disconnect: clean up the userId→socketId mapping and mark seat as disconnected.
+  // On disconnect: clean up the userId->socketId mapping and mark seat as disconnected.
   // Do NOT call userLeavesSeat — the 3-skip rule handles eviction.
   socket.on('disconnect', async () => {
     for (const [deskId, runtime] of deskRuntime) {
