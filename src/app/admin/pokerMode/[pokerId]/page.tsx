@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import ModeCreateForm from '@/components/admin/poker/ModeCreateForm';
 import ModeRowActions from '@/components/admin/poker/ModeRowActions';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminPokerGames, getAdminPokerModes } from '@/lib/admin/db';
 
 interface PokerGame {
   id: string;
@@ -58,8 +58,8 @@ export default async function PokerModePage({
   const { pokerId } = params;
 
   const [pokerData, modesData] = await Promise.all([
-    fetchAdmin<{ games: PokerGame[] }>('/api/admin/poker'),
-    fetchAdmin<{ modes: PokerMode[] }>('/api/admin/pokerModes', { pokerId }),
+    getAdminPokerGames(),
+    getAdminPokerModes({ pokerId }),
   ]);
 
   const poker = pokerData.games.find((g: PokerGame) => g.id === pokerId);

@@ -1,5 +1,3 @@
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Header from '@/components/admin/Header';
 import UserStats from '@/components/admin/widgets/UserStats';
 import GameStats from '@/components/admin/widgets/GameStats';
@@ -8,23 +6,12 @@ import GameUsage from '@/components/admin/widgets/GameUsage';
 import BankTransactionOverview from '@/components/admin/widgets/BankTransactionOverview';
 import LatestPlayers from '@/components/admin/widgets/LatestPlayers';
 import LeaderBoard from '@/components/admin/widgets/LeaderBoard';
-import type { DashboardData } from '@/types/adminTypes';
+import { getAdminDashboard } from '@/lib/admin/db';
 
 export const revalidate = 300;
 
-async function getDashboard(): Promise<DashboardData> {
-  const token = cookies().get('token')?.value ?? '';
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000';
-  const res = await fetch(`${base}/api/admin/analytics/dashboard`, {
-    headers: { Cookie: `token=${token}` },
-    next: { revalidate: 300 },
-  });
-  if (!res.ok) redirect('/auth/login');
-  return res.json();
-}
-
 export default async function OverviewPage() {
-  const data = await getDashboard();
+  const data = await getAdminDashboard();
 
   return (
     <>

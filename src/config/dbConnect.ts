@@ -19,7 +19,6 @@ if (!cached) {
 
 export default async function dbConnect(): Promise<mongoose.Connection> {
   if (cached.conn) {
-    console.log("=> Using existing database connection");
     return cached.conn;
   }
 
@@ -37,10 +36,10 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
     const opts = {
       dbName: DB_NAME,
       bufferCommands: false,
-      // Note: useNewUrlParser and useUnifiedTopology are removed as they are deprecated in Mongoose 6+
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
     };
 
-    console.log("=> Creating new database connection");
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
       return mongooseInstance.connection;
     });

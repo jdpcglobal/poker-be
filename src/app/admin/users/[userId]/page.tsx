@@ -4,62 +4,15 @@ import UserStatusControl from '@/components/admin/users/UserStatusControl';
 import UserBalanceControl from '@/components/admin/users/UserBalanceControl';
 import LatestGameHistory from '@/components/admin/widgets/LatestGameHistory';
 import UserBankTransactionsHistory from '@/components/admin/widgets/UserBankTransactionsHistory';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
-import type { UserGameEntry, UserBankTransaction, PaginationInfo } from '@/types/adminTypes';
-
-interface BankEntry {
-  bankId: string;
-  accountNumber: string;
-  bankName: string;
-  ifscCode: string;
-  accountHolderName: string;
-  isDefault: boolean;
-  status: 'active' | 'blocked' | 'inactive';
-}
-
-interface UserDetail {
-  user: {
-    userId: string;
-    username: string;
-    email: string;
-    status: 'active' | 'inactive' | 'suspended';
-    mobileNumber: string | null;
-    lastLogin: Date | null;
-    createdAt: Date;
-  };
-  wallet: {
-    balance: string;
-    instantBonus: string;
-    lockedBonus: string;
-    currency: string;
-  } | null;
-  banks: BankEntry[];
-}
-
-interface AnalyticsDetail {
-  stats: {
-    gamesPlayed: number;
-    wins: number;
-    winRate: string;
-    totalNetChange: string;
-    totalBet: string;
-    currency: string;
-  } | null;
-  games: UserGameEntry[];
-  pagination: PaginationInfo;
-}
-
-interface BankTxResponse {
-  transactions: UserBankTransaction[];
-  pagination: PaginationInfo;
-}
+import { getAdminUserDetail, getAdminUserAnalytics, getAdminBankTransactions } from '@/lib/admin/db';
+import { redirect } from 'next/navigation';
 
 function StatusBadge(status: string) {
   const map: Record<string, string> = {
-    active: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
-    inactive: 'bg-slate-100 text-slate-600',
+    active:    'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+    inactive:  'bg-slate-100 text-slate-600',
     suspended: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
-    blocked: 'bg-red-50 text-red-700 ring-1 ring-red-600/20',
+    blocked:   'bg-red-50 text-red-700 ring-1 ring-red-600/20',
   };
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${map[status] ?? 'bg-slate-100 text-slate-600'}`}>
@@ -80,10 +33,12 @@ export default async function UserDetailPage({
   const bpage = searchParams.bpage ?? '1';
 
   const [userData, analyticsData, bankTxData] = await Promise.all([
-    fetchAdmin<UserDetail>(`/api/admin/users/${userId}`),
-    fetchAdmin<AnalyticsDetail>(`/api/admin/analytics/users/${userId}`, { page: gpage, limit: '10' }),
-    fetchAdmin<BankTxResponse>('/api/admin/bankTransactions', { userId, page: bpage, limit: '10' }),
+    getAdminUserDetail(userId),
+    getAdminUserAnalytics(userId, { page: gpage, limit: '10' }),
+    getAdminBankTransactions({ page: bpage, limit: '10', status: '', type: '', userId }),
   ]);
+
+  if (!userData) redirect('/admin/users');
 
   return (
     <>
@@ -140,14 +95,14 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        {analyticsData.stats && (
+        {analyticsData?.stats && (
           <div className="grid grid-cols-5 gap-4">
             {[
               ['Games played', String(analyticsData.stats.gamesPlayed)],
-              ['Wins', String(analyticsData.stats.wins)],
-              ['Win rate', analyticsData.stats.winRate],
-              ['Net change', analyticsData.stats.totalNetChange],
-              ['Total bet', analyticsData.stats.totalBet],
+              ['Wins',         String(analyticsData.stats.wins)],
+              ['Win rate',     analyticsData.stats.winRate],
+              ['Net change',   analyticsData.stats.totalNetChange],
+              ['Total bet',    analyticsData.stats.totalBet],
             ].map(([label, value]) => (
               <div key={label} className="bg-white rounded-lg border border-slate-200 p-4">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
@@ -160,7 +115,12 @@ export default async function UserDetailPage({
           </div>
         )}
 
-        <LatestGameHistory games={analyticsData.games} pagination={analyticsData.pagination} />
+        {analyticsData && (
+          <LatestGameHistory
+            games={analyticsData.games}
+            pagination={analyticsData.pagination}
+          />
+        )}
 
         <UserBankTransactionsHistory
           transactions={bankTxData.transactions}

@@ -5,9 +5,15 @@
  * the role is exactly 'admin', and confirms the admin's status is 'active' in
  * the database. Throws a typed AuthError on any failure.
  *
- * The DB check (status === 'active') is deliberate — it costs one indexed
- * findById per admin request but provides immediate revocation when an admin
- * is disabled. With a small admin set this is the right trade-off; see LOGS.md.
+ * DB call caching
+ * ---------------
+ * The Admin.findById check is cached in memory for 30 seconds per token. The
+ * JWT signature already guarantees the payload has not been tampered with; the
+ * DB check exists solely for revocation (admin disabled mid-session). A 30s
+ * cache window means revocation takes effect within 30 seconds — acceptable
+ * for a small admin set. The cache is keyed by the raw token string so each
+ * unique session gets its own entry, and entries are evicted automatically
+ * when the TTL expires.
  *
  * Routes use this at the top of every protected admin handler:
  *
@@ -21,9 +27,6 @@
  * The error-to-response translation lives in src/lib/api/errors.ts (task 1.5).
  * This file knows nothing about HTTP status codes — that's the route layer's
  * concern.
- *
- * Note: this guard is ASYNC (unlike requireUser) because it hits the DB. Call
- * sites must `await` it.
  */
 
 import type { NextRequest } from 'next/server';
@@ -36,6 +39,35 @@ import { AuthError } from '@/lib/api/errors';
 
 const COOKIE_NAME = 'token';
 
+// ---------------------------------------------------------------------------
+// In-memory verification cache
+// ---------------------------------------------------------------------------
+
+const CACHE_TTL_MS = 30_000; // 30 seconds
+
+interface CacheEntry {
+  context: AdminAuthContext;
+  expiresAt: number;
+}
+
+const verificationCache = new Map<string, CacheEntry>();
+
+/**
+ * Evicts all expired entries from the cache. Called on every cache write so
+ * the map never grows unboundedly — with a small admin set (2–5 people) this
+ * is effectively O(1) in practice.
+ */
+function evictExpired(): void {
+  const now = Date.now();
+  for (const [key, entry] of verificationCache) {
+    if (entry.expiresAt <= now) verificationCache.delete(key);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 /**
  * The shape this guard returns. Carries both the id (most routes only need
  * this) and the full admin document (for routes that need to read name/email
@@ -46,26 +78,33 @@ export interface AdminAuthContext {
   role: 'admin';
   /** The decoded JWT payload, for routes that need other claims. */
   payload: IJwtPayload;
-  /** The full Admin document, freshly loaded. */
+  /** The full Admin document, freshly loaded from DB (or from cache). */
   admin: IAdminDocument;
 }
+
+// ---------------------------------------------------------------------------
+// Guard
+// ---------------------------------------------------------------------------
 
 /**
  * Verifies the admin's cookie, checks role, and confirms the admin is active
  * in the DB. Returns the auth context on success. Throws AuthError otherwise.
  *
+ * The DB lookup is skipped on repeated calls within 30 seconds for the same
+ * token — see file-level comment for the reasoning.
+ *
  * Failure codes:
  *   - MISSING_AUTH_COOKIE — no `token` cookie on the request
  *   - INVALID_TOKEN       — verifyToken returned null (bad signature, expired, malformed)
  *   - MISSING_USER_ID     — token verified but payload had no userId
- *   - WRONG_ROLE          — token verified but role isn't 'admin' (a user token used here)
- *   - ADMIN_NOT_FOUND     — token's userId doesn't resolve to an Admin record (admin deleted mid-session)
- *   - ADMIN_NOT_ACTIVE    — admin exists but status is 'inactive' (immediate revocation)
+ *   - WRONG_ROLE          — token verified but role isn't 'admin'
+ *   - ADMIN_NOT_FOUND     — token's userId doesn't resolve to an Admin record
+ *   - ADMIN_NOT_ACTIVE    — admin exists but status is 'inactive'
  */
 export async function requireAdmin(
   req: NextRequest
 ): Promise<AdminAuthContext> {
-  // Cookie lookup. Next's NextRequest cookies API returns { name, value } | undefined.
+  // ── 1. Cookie ──────────────────────────────────────────────────────────────
   const cookie = req.cookies.get(COOKIE_NAME);
   if (!cookie || !cookie.value) {
     throw new AuthError(
@@ -74,9 +113,10 @@ export async function requireAdmin(
     );
   }
 
-  // Collapse all token-verification failures to one client-facing error code.
-  // Distinguishing "expired" from "bad signature" leaks information.
-  const payload = verifyToken(cookie.value);
+  const rawToken = cookie.value;
+
+  // ── 2. JWT verification (synchronous — no DB) ──────────────────────────────
+  const payload = verifyToken(rawToken);
   if (!payload) {
     throw new AuthError(
       'INVALID_TOKEN',
@@ -85,15 +125,12 @@ export async function requireAdmin(
   }
 
   if (!payload.userId) {
-    // Should be impossible — signToken requires userId — but defensive.
     throw new AuthError(
       'MISSING_USER_ID',
       'Authentication token is missing userId'
     );
   }
 
-  // Strict role check: must be exactly 'admin'. User tokens (role 'user'),
-  // roleless tokens, and any legacy roles ('editor', 'viewer') are rejected.
   if (payload.role !== 'admin') {
     throw new AuthError(
       'WRONG_ROLE',
@@ -101,17 +138,16 @@ export async function requireAdmin(
     );
   }
 
-  // DB check. The cost (one indexed findById) buys immediate revocation when
-  // an admin is disabled mid-session. With a tiny admin set this is the right
-  // trade-off; see LOGS.md for the deliberation.
-  //
-  // dbConnect is idempotent (cached connection) — calling it from every guard
-  // is the standard pattern and not a per-request cost.
+  // ── 3. Cache check — skip DB if we verified this token recently ────────────
+  const cached = verificationCache.get(rawToken);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.context;
+  }
+
+  // ── 4. DB verification ─────────────────────────────────────────────────────
   await dbConnect();
   const admin = await Admin.findById(payload.userId);
   if (!admin) {
-    // Admin record was deleted while their session was still valid. Treat as
-    // a normal auth failure rather than a 500; the session is genuinely gone.
     throw new AuthError(
       'ADMIN_NOT_FOUND',
       'Authenticated admin no longer exists'
@@ -119,16 +155,26 @@ export async function requireAdmin(
   }
 
   if (admin.status !== 'active') {
+    // Do not cache failed verifications — status may flip back to active.
     throw new AuthError(
       'ADMIN_NOT_ACTIVE',
       'Admin account is not active'
     );
   }
 
-  return {
+  // ── 5. Populate cache ──────────────────────────────────────────────────────
+  const context: AdminAuthContext = {
     adminId: payload.userId,
     role: 'admin',
     payload,
     admin,
   };
+
+  evictExpired();
+  verificationCache.set(rawToken, {
+    context,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+
+  return context;
 }

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import DeskCreateForm from '@/components/admin/poker/DeskCreateForm';
 import DeskRowActions from '@/components/admin/poker/DeskRowActions';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminPokerModes, getAdminPokerDesks } from '@/lib/admin/db';
 
 interface ModeShape {
   id: string;
@@ -57,8 +57,8 @@ export default async function PokerDeskPage({
   const { pokerModeId } = params;
 
   const [modesData, desksData] = await Promise.all([
-    fetchAdmin<{ modes: ModeShape[] }>('/api/admin/pokerModes', { pokerId: '' }),
-    fetchAdmin<{ desks: DeskShape[] }>('/api/admin/pokerDesks', { pokerModeId }),
+    getAdminPokerModes(),
+    getAdminPokerDesks({ pokerModeId }),
   ]);
 
   const mode = modesData.modes.find((m) => m.id === pokerModeId);
@@ -117,6 +117,7 @@ export default async function PokerDeskPage({
                       currentMinToStart={d.minToStart}
                       currentMinToContinue={d.minToContinue}
                       currentMaxPlayerCount={d.maxPlayerCount}
+                      seatedCount={d.seatedCount}
                     />
                   </td>
                 </tr>

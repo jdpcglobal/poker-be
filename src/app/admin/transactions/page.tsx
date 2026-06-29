@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import TransactionsFilters from '@/components/admin/transactions/TransactionsFilters';
 import BankTransactionActions from '@/components/admin/transactions/BankTransactionActions';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminBankTransactions } from '@/lib/admin/db';
 
 interface BankAccount {
   bankId: string;
@@ -65,7 +65,7 @@ export default async function TransactionsPage({
   const status = searchParams.status ?? '';
   const type = searchParams.type ?? '';
 
-  const { transactions, pagination } = await fetchAdmin<TxData>('/api/admin/bankTransactions', {
+  const { transactions, pagination } = await getAdminBankTransactions({
     page,
     limit: '20',
     status,

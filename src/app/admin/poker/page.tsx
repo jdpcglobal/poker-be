@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import PokerCreateForm from '@/components/admin/poker/PokerCreateForm';
 import PokerRowActions from '@/components/admin/poker/PokerRowActions';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminPokerGames } from '@/lib/admin/db';
 
 interface PokerGame {
   id: string;
@@ -28,7 +28,7 @@ function StatusBadge(status: string) {
 }
 
 export default async function PokerPage() {
-  const { games } = await fetchAdmin<{ games: PokerGame[] }>('/api/admin/poker');
+  const { games } = await getAdminPokerGames();
 
   return (
     <>

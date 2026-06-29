@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Header from '@/components/admin/Header';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminPokerDesks } from '@/lib/admin/db';
+import { redirect } from 'next/navigation';
 
 interface DeskShape {
   id: string;
@@ -61,24 +62,10 @@ export default async function DeskDetailPage({
   const { deskId } = params;
   const { modeId } = searchParams;
 
-  const { desks } = await fetchAdmin<{ desks: DeskShape[] }>('/api/admin/pokerDesks');
+  const { desks } = await getAdminPokerDesks();
   const desk = desks.find((d) => d.id === deskId);
 
-  if (!desk) {
-    return (
-      <>
-        <Header title="Desk not found" />
-        <div className="p-6">
-          {modeId && (
-            <Link href={`/admin/pokerDesk/${modeId}`} className="text-sm text-indigo-600 hover:underline">
-              ← Back to desks
-            </Link>
-          )}
-          <p className="mt-4 text-sm text-slate-500">No desk with id {deskId}.</p>
-        </div>
-      </>
-    );
-  }
+  if (!desk) redirect(modeId ? `/admin/pokerDesk/${modeId}` : '/admin/poker');
 
   return (
     <>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import UsersFilters from '@/components/admin/UsersFilters';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminUsers } from '@/lib/admin/db';
 
 interface UserEntry {
   userId: string;
@@ -45,7 +45,7 @@ export default async function UsersPage({
   const search = searchParams.search ?? '';
   const status = searchParams.status ?? '';
 
-  const { users, pagination } = await fetchAdmin<UsersData>('/api/admin/users', {
+  const { users, pagination } = await getAdminUsers({
     page,
     limit: '20',
     search,

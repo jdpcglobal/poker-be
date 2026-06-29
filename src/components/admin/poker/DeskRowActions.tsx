@@ -11,6 +11,7 @@ interface Props {
   currentMinToStart: number;
   currentMinToContinue: number;
   currentMaxPlayerCount: number;
+  seatedCount: number;
 }
 
 export default function DeskRowActions({
@@ -20,6 +21,7 @@ export default function DeskRowActions({
   currentMinToStart,
   currentMinToContinue,
   currentMaxPlayerCount,
+  seatedCount,
 }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState(
@@ -27,6 +29,7 @@ export default function DeskRowActions({
   );
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmForceClose, setConfirmForceClose] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -82,10 +85,36 @@ export default function DeskRowActions({
     }
   }
 
+  async function handleForceClose() {
+    if (!confirmForceClose) {
+      setConfirmForceClose(true);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/pokerDesks/${id}/force-close`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const body = await res.json();
+        setError(body.message ?? 'Force close failed');
+      }
+      setConfirmForceClose(false);
+    } catch {
+      setError('Force close failed');
+      setConfirmForceClose(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleEditSave() {
     setEditError(null);
-    const minStart = parseInt(editMinToStart);
-    const minCont = parseInt(editMinToContinue);
+    const minStart   = parseInt(editMinToStart);
+    const minCont    = parseInt(editMinToContinue);
     const maxPlayers = parseInt(editMaxPlayerCount);
 
     if (!editTableName.trim()) {
@@ -93,15 +122,15 @@ export default function DeskRowActions({
       return;
     }
     if (isNaN(minStart) || minStart < 3 || isNaN(minCont) || minCont < 3 || isNaN(maxPlayers) || maxPlayers < 3) {
-      setEditError('All number fields must be ≥ 3');
+      setEditError('All number fields must be >= 3');
       return;
     }
     if (maxPlayers < minStart) {
-      setEditError('Max players must be ≥ min to start');
+      setEditError('Max players must be >= min to start');
       return;
     }
     if (minCont > minStart) {
-      setEditError('Min to continue must be ≤ min to start');
+      setEditError('Min to continue must be <= min to start');
       return;
     }
 
@@ -111,9 +140,9 @@ export default function DeskRowActions({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tableName: editTableName.trim(),
-          minToStart: minStart,
-          minToContinue: minCont,
+          tableName:      editTableName.trim(),
+          minToStart:     minStart,
+          minToContinue:  minCont,
           maxPlayerCount: maxPlayers,
         }),
       });
@@ -130,6 +159,8 @@ export default function DeskRowActions({
       setLoading(false);
     }
   }
+
+  const alreadyClosed = currentStatus === 'closed' && seatedCount === 0;
 
   return (
     <>
@@ -158,6 +189,32 @@ export default function DeskRowActions({
           >
             Edit
           </button>
+
+          {/* Force Close — only shown when desk is not already cleanly closed */}
+          {!alreadyClosed && (
+            <>
+              <button
+                onClick={handleForceClose}
+                disabled={loading}
+                className={`text-xs font-medium px-2.5 py-1 rounded transition-colors disabled:opacity-50 ${
+                  confirmForceClose
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                    : 'border border-orange-400 text-orange-600 hover:bg-orange-50'
+                }`}
+              >
+                {confirmForceClose ? 'Confirm close' : 'Force Close'}
+              </button>
+              {confirmForceClose && (
+                <button
+                  onClick={() => setConfirmForceClose(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+              )}
+            </>
+          )}
+
           <button
             onClick={handleDelete}
             disabled={loading}
@@ -239,7 +296,7 @@ export default function DeskRowActions({
               onClick={handleEditSave}
               className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors"
             >
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>

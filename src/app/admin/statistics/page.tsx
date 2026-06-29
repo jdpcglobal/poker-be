@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import TrendChart from '@/components/admin/widgets/TrendChart';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminStatistics } from '@/lib/admin/db';
 import { toMajor, DEFAULT_CURRENCY } from '@/config/constants';
 import type { StatisticsData } from '@/types/adminTypes';
 
@@ -15,7 +15,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 }
 
 export default async function StatisticsPage() {
-  const data = await fetchAdmin<StatisticsData>('/api/admin/analytics/statistics');
+  const data = await getAdminStatistics();
 
   const labels = data.dailySignups.map((d) => d.date.slice(5));
   const signupsSeries = data.dailySignups.map((d) => d.count);

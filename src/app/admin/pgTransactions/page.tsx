@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Header from '@/components/admin/Header';
 import PgTransactionsFilters from '@/components/admin/transactions/PgTransactionsFilters';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminGatewayTransactions } from '@/lib/admin/db';
 
 interface PgTx {
   id: string;
@@ -42,7 +42,7 @@ export default async function PgTransactionsPage({
   const page = searchParams.page ?? '1';
   const status = searchParams.status ?? '';
 
-  const { transactions, pagination } = await fetchAdmin<PgTxData>('/api/admin/gatewayTransaction', {
+  const { transactions, pagination } = await getAdminGatewayTransactions({
     page,
     limit: '20',
     status,

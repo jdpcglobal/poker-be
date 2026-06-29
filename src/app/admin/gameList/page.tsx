@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Header from '@/components/admin/Header';
-import { fetchAdmin } from '@/lib/admin/fetchAdmin';
+import { getAdminGames } from '@/lib/admin/db';
 
 interface GamePlayer {
   userId: string;
@@ -41,10 +41,7 @@ export default async function GameListPage({
   const params: Record<string, string> = { page, limit: '20' };
   if (gameType) params.gameType = gameType;
 
-  const { games, pagination } = await fetchAdmin<GamesData>(
-    '/api/admin/analytics/games',
-    params
-  );
+  const { games, pagination } = await getAdminGames({ page, limit: '20', gameType });
 
   function paginationHref(p: number) {
     const sp = new URLSearchParams();
