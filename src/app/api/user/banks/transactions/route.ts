@@ -69,16 +69,59 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * Validates an externally-hosted receipt URL provided in the JSON path.
+ * Only http(s) URLs are accepted — this is a defensive check, not a guarantee
+ * the URL is reachable or actually an image.
+ */
+function isValidHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId } = requireUser(req);
     await dbConnect();
 
-    const formData = await req.formData();
+    const contentType = req.headers.get('content-type') ?? '';
+    const isJson = contentType.includes('application/json');
 
-    const type = formData.get('type');
-    const bankAccountId = formData.get('bankAccountId');
-    const amountRaw = formData.get('amount');
+    let type: unknown;
+    let bankAccountId: unknown;
+    let amountRaw: unknown;
+    let remark: unknown;
+    // Pre-hosted image URL — only populated on the JSON path.
+    let providedImageUrl: string | null = null;
+    // Raw uploaded file — only populated on the multipart path.
+    let imageFile: File | null = null;
+
+    if (isJson) {
+      const body = await req.json();
+      type = body.type;
+      bankAccountId = body.bankAccountId;
+      amountRaw = body.amount;
+      remark = body.remark;
+      if (body.imageUrl !== undefined) {
+        if (!isValidHttpUrl(body.imageUrl)) {
+          throw new AuthError('MISSING_IMAGE', 'imageUrl must be a valid http(s) URL');
+        }
+        providedImageUrl = body.imageUrl;
+      }
+    } else {
+      const formData = await req.formData();
+      type = formData.get('type');
+      bankAccountId = formData.get('bankAccountId');
+      amountRaw = formData.get('amount');
+      remark = formData.get('remark');
+      const fileField = formData.get('image');
+      if (fileField instanceof File) imageFile = fileField;
+    }
 
     if (!type || (type !== 'deposit' && type !== 'withdraw')) {
       throw new AuthError('MISSING_BANK_FIELD', 'type must be "deposit" or "withdraw"');
@@ -86,13 +129,11 @@ export async function POST(req: NextRequest) {
     if (!bankAccountId || typeof bankAccountId !== 'string' || !bankAccountId.trim()) {
       throw new AuthError('MISSING_BANK_FIELD', 'bankAccountId is required');
     }
-    if (amountRaw === null) {
+    if (amountRaw === null || amountRaw === undefined) {
       throw new AuthError('MISSING_BANK_FIELD', 'amount is required');
     }
 
     const parsedAmount = parseAmount(Number(amountRaw), DEFAULT_CURRENCY);
-
-    const remark = formData.get('remark');
 
     const bankAccount = await BankAccount.findOne({
       _id: bankAccountId.trim(),
@@ -106,23 +147,26 @@ export async function POST(req: NextRequest) {
     let imageUrl: string | null = null;
 
     if (type === 'deposit') {
-      const imageFile = formData.get('image');
-      if (!imageFile || !(imageFile instanceof File)) {
+      if (providedImageUrl) {
+        // JSON path: client already hosted the receipt image elsewhere.
+        imageUrl = providedImageUrl;
+      } else if (imageFile) {
+        // multipart path: file uploaded directly to this server.
+        const maxSize = parseInt(process.env.MAX_FILE_SIZE ?? String(DEFAULT_MAX_FILE_SIZE), 10);
+        if (imageFile.size > maxSize) {
+          throw new AuthError('MISSING_IMAGE', `Image exceeds maximum allowed size of ${maxSize} bytes`);
+        }
+
+        const uploadDir = process.env.UPLOAD_DIR ?? 'uploads';
+        await mkdir(uploadDir, { recursive: true });
+
+        const filename = `${Date.now()}-${imageFile.name}`;
+        const filepath = path.join(uploadDir, filename);
+        await writeFile(filepath, Buffer.from(await imageFile.arrayBuffer()));
+        imageUrl = `${uploadDir}/${filename}`;
+      } else {
         throw new AuthError('MISSING_IMAGE', 'A deposit receipt image is required');
       }
-
-      const maxSize = parseInt(process.env.MAX_FILE_SIZE ?? String(DEFAULT_MAX_FILE_SIZE), 10);
-      if (imageFile.size > maxSize) {
-        throw new AuthError('MISSING_IMAGE', `Image exceeds maximum allowed size of ${maxSize} bytes`);
-      }
-
-      const uploadDir = process.env.UPLOAD_DIR ?? 'uploads';
-      await mkdir(uploadDir, { recursive: true });
-
-      const filename = `${Date.now()}-${imageFile.name}`;
-      const filepath = path.join(uploadDir, filename);
-      await writeFile(filepath, Buffer.from(await imageFile.arrayBuffer()));
-      imageUrl = `${uploadDir}/${filename}`;
     }
 
     if (type === 'withdraw') {
