@@ -440,7 +440,7 @@ async function handleNeedsShowdown(deskId: string): Promise<void> {
       deskRuntime.delete(deskId);
       return;
     }
-    scheduleAutoStart(deskId, 8000);
+    scheduleAutoStart(deskId, 3000);
   }
 }
 
@@ -454,7 +454,7 @@ async function handleAllInRunout(deskId: string): Promise<void> {
   await handleNeedsShowdown(deskId);
 }
 
-function scheduleAutoStart(deskId: string, delayMs = 8000): void {
+function scheduleAutoStart(deskId: string, delayMs = 3000): void {
   const runtime = getOrCreateRuntime(deskId);
   if (runtime.autoStartTimer) clearTimeout(runtime.autoStartTimer);
   runtime.autoStartTimer = setTimeout(async () => {
@@ -625,7 +625,7 @@ export function attachSocketServer(httpServer: HttpServer): void {
         if (desk.seats.length >= threshold) {
           // 5s delay for the very first hand; 3s between subsequent hands.
           const isFirstHand = !desk.firstGameStartedAt;
-          scheduleAutoStart(deskId, isFirstHand ? 5000 : 8000);
+          scheduleAutoStart(deskId, isFirstHand ? 5000 : 3000);
         }
       } catch (err) {
         const code    = err instanceof ServiceError ? err.code : 'INTERNAL_ERROR';
@@ -870,7 +870,7 @@ export function attachSocketServer(httpServer: HttpServer): void {
           : latestDesk.minToStart;
         if (latestDesk.seats.length >= threshold) {
           const isFirstHand = !latestDesk.firstGameStartedAt;
-          scheduleAutoStart(deskId, isFirstHand ? 5000 : 8000);
+          scheduleAutoStart(deskId, isFirstHand ? 5000 : 3000);
         }
       } catch (err) {
         const code    = err instanceof ServiceError ? err.code : 'INTERNAL_ERROR';

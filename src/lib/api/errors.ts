@@ -129,6 +129,22 @@ function statusForCode(code: string): number {
     case 'INVALID_STATE':
       return 400;
 
+    // Daily bonus (src/app/api/user/wallet/daily-bonus)
+    case 'ALREADY_CLAIMED_TODAY':
+      return 400;
+
+    // Ad reward (src/app/api/user/wallet/ad-reward + lib/ads/verifyAdToken)
+    case 'MISSING_AD_CALLBACK':
+    case 'MISSING_SIGNATURE':
+    case 'UNKNOWN_KEY_ID':
+    case 'INVALID_SIGNATURE':
+    case 'STALE_CALLBACK':
+    case 'MALFORMED_PAYLOAD':
+    case 'AD_REWARD_DAILY_CAP_REACHED':
+      return 400;
+    case 'DUPLICATE_AD_CLAIM':
+      return 409;
+
     // InvalidAmountError variants (see lib/api/money.ts)
     case 'INVALID_AMOUNT_TYPE':
     case 'INVALID_AMOUNT_VALUE':

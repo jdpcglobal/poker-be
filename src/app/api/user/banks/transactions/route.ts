@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
+import mongoose from 'mongoose';
 
 import dbConnect from '@/config/dbConnect';
 import { DEFAULT_CURRENCY } from '@/config/constants';
@@ -131,6 +132,9 @@ export async function POST(req: NextRequest) {
     }
     if (amountRaw === null || amountRaw === undefined) {
       throw new AuthError('MISSING_BANK_FIELD', 'amount is required');
+    }
+    if (!mongoose.Types.ObjectId.isValid(bankAccountId.trim())) {
+      throw new AuthError('INVALID_BANK_ACCOUNT', 'bankAccountId is not a valid id');
     }
 
     const parsedAmount = parseAmount(Number(amountRaw), DEFAULT_CURRENCY);
