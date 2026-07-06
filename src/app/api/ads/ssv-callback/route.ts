@@ -6,9 +6,29 @@ import Wallet from '@/models/wallet';
 import WalletTransaction from '@/models/walletTransaction';
 import AdRewardReceipt from '@/models/adRewardReceipt';
 import AdRewardGrant from '@/models/adRewardGrant';
+import AdCallbackLog from '@/models/adCallbackLog';
 import { verifyAdReward, AdVerificationError } from '@/lib/ads/verifyAdToken';
 import { verifyGrant, GrantVerificationError } from '@/lib/ads/adRewardGrant';
 import { AD_REWARD_FIXED_MINOR, AD_REWARD_DAILY_CAP } from '@/config/creditsConfig';
+
+/**
+ * DIAGNOSTIC AID — logs every hit to AdCallbackLog before anything else runs,
+ * so callback delivery can be confirmed by querying MongoDB directly rather
+ * than needing Azure Log Stream / platform log access. Never throws — a
+ * failure here must never block the actual credit logic below.
+ */
+async function logCallback(rawQuery: string, outcome: string, userId: string | null) {
+  try {
+    await AdCallbackLog.create({
+      rawQuery,
+      outcome,
+      userId: userId ?? null,
+      receivedAt: new Date(),
+    });
+  } catch (e) {
+    console.error('[ssv-callback] failed to write AdCallbackLog (non-fatal):', e);
+  }
+}
 
 /**
  * PUBLIC — configure this exact URL in the AdMob console as the Rewarded Ad
@@ -37,12 +57,18 @@ export async function GET(req: NextRequest) {
 
     const rawQuery = req.nextUrl.search.replace(/^\?/, '');
 
+    // Log receipt IMMEDIATELY, before verification — this line firing proves
+    // Google (or anyone) actually reached this URL at all, independent of
+    // whether verification below succeeds.
+    await logCallback(rawQuery, 'received', null);
+
     let verifiedAd;
     try {
       verifiedAd = await verifyAdReward(rawQuery);
     } catch (e) {
       if (e instanceof AdVerificationError) {
         console.error('[ssv-callback] ad verification failed:', e.code, e.message);
+        await logCallback(rawQuery, `rejected:${e.code}`, null);
         return new NextResponse('OK', { status: 200 });
       }
       throw e;
@@ -53,6 +79,7 @@ export async function GET(req: NextRequest) {
     const customData = req.nextUrl.searchParams.get('custom_data');
     if (!customData) {
       console.error('[ssv-callback] missing custom_data on otherwise-valid callback');
+      await logCallback(rawQuery, 'rejected:MISSING_CUSTOM_DATA', null);
       return new NextResponse('OK', { status: 200 });
     }
 
@@ -62,6 +89,7 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       if (e instanceof GrantVerificationError) {
         console.error('[ssv-callback] grant verification failed:', e.code, e.message);
+        await logCallback(rawQuery, `rejected:${e.code}`, null);
         return new NextResponse('OK', { status: 200 });
       }
       throw e;
@@ -72,6 +100,7 @@ export async function GET(req: NextRequest) {
     const wallet = await Wallet.findOne({ userId });
     if (!wallet) {
       console.error('[ssv-callback] no wallet for userId from grant:', userId);
+      await logCallback(rawQuery, 'rejected:NO_WALLET', userId);
       return new NextResponse('OK', { status: 200 });
     }
 
@@ -83,6 +112,7 @@ export async function GET(req: NextRequest) {
     });
     if (claimedToday >= AD_REWARD_DAILY_CAP) {
       console.warn('[ssv-callback] daily cap reached for userId:', userId);
+      await logCallback(rawQuery, 'rejected:DAILY_CAP_REACHED', userId);
       return new NextResponse('OK', { status: 200 });
     }
 
@@ -152,6 +182,7 @@ export async function GET(req: NextRequest) {
       const err = e as { code?: number; message?: string };
       if (err?.code === 11000 || err?.message === 'GRANT_ALREADY_REDEEMED') {
         console.warn('[ssv-callback] duplicate/replay rejected:', err.message ?? err.code);
+        await logCallback(rawQuery, 'rejected:DUPLICATE_OR_REPLAY', userId);
         return new NextResponse('OK', { status: 200 });
       }
       throw e;
@@ -159,6 +190,7 @@ export async function GET(req: NextRequest) {
       await session.endSession();
     }
 
+    await logCallback(rawQuery, 'credited', userId);
     return new NextResponse('OK', { status: 200 });
   } catch (err) {
     console.error('[ssv-callback] unhandled error:', err);
