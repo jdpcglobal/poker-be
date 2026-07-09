@@ -82,27 +82,46 @@ export class AdVerificationError extends Error {
  * the client, or received directly server-side depending on your ad SDK
  * integration).
  *
+ * IMPORTANT: per Google's spec, the content being verified is the RAW
+ * substring of the original query string up to (not including) `&signature=`
+ * — NOT a re-serialized/rebuilt string. Rebuilding via URLSearchParams.toString()
+ * can change percent-encoding/ordering versus what Google actually signed,
+ * which silently breaks verification for every genuine callback. This
+ * function deliberately does substring extraction, not URLSearchParams,
+ * for the signed-content portion.
+ *
  * @throws AdVerificationError on any verification failure.
  */
 export async function verifyAdReward(rawQuery: string): Promise<VerifiedAdReward> {
-  const params = new URLSearchParams(rawQuery);
+  const SIGNATURE_PARAM = 'signature=';
+  const KEY_ID_PARAM = 'key_id=';
 
-  const signature = params.get('signature');
-  const keyId = params.get('key_id');
-  if (!signature || !keyId) {
+  const sigIndex = rawQuery.indexOf(SIGNATURE_PARAM);
+  if (sigIndex === -1) {
     throw new AdVerificationError(
       'MISSING_SIGNATURE',
       'Ad reward callback is missing signature or key_id'
     );
   }
 
-  // The signed content is every param EXCEPT `signature`, in the order sent,
-  // reconstructed as the raw query string (per AdMob SSV spec — `signature`
-  // and everything after it in the original URL is excluded from what's signed).
-  const signedContentParams = new URLSearchParams(rawQuery);
-  signedContentParams.delete('signature');
-  signedContentParams.delete('key_id');
-  const signedContent = signedContentParams.toString();
+  // Everything before "&signature=" is the exact content Google signed.
+  // sigIndex - 1 strips the preceding '&' (per Google's reference impl).
+  const signedContent = rawQuery.substring(0, sigIndex - 1);
+
+  const afterSig = rawQuery.substring(sigIndex + SIGNATURE_PARAM.length);
+  const keyIdIndex = afterSig.indexOf(KEY_ID_PARAM);
+  if (keyIdIndex === -1) {
+    throw new AdVerificationError(
+      'MISSING_SIGNATURE',
+      'Ad reward callback is missing signature or key_id'
+    );
+  }
+
+  // signature/key_id ARE percent-decoded — they weren't part of the signed
+  // content, so decoding them for use here is safe and necessary (they
+  // arrive URL-encoded like any other query value).
+  const signature = decodeURIComponent(afterSig.substring(0, keyIdIndex - 1));
+  const keyId = decodeURIComponent(afterSig.substring(keyIdIndex + KEY_ID_PARAM.length));
 
   const keys = await fetchPublicKeys();
   const publicKeyB64 = keys.get(keyId);
@@ -124,6 +143,11 @@ export async function verifyAdReward(rawQuery: string): Promise<VerifiedAdReward
   if (!isValid) {
     throw new AdVerificationError('INVALID_SIGNATURE', 'Ad reward signature verification failed');
   }
+
+  // Safe to use URLSearchParams for the remaining fields — decoding these
+  // for reading doesn't affect the signature check above, which already
+  // ran against the untouched raw substring.
+  const params = new URLSearchParams(rawQuery);
 
   const timestamp = Number(params.get('timestamp'));
   if (!Number.isFinite(timestamp) || Date.now() - timestamp > MAX_CALLBACK_AGE_MS) {
