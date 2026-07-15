@@ -301,11 +301,13 @@ export default function HomePage() {
             <span>♠</span>
             <span>PokerApp</span>
           </div>
-          <p>&copy; {new Date().getFullYear()} PokerApp. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} JDPC Global Pvt Ltd. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#features"     className="hover:text-slate-400 transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-slate-400 transition-colors">How It Works</a>
             <a href="#game-modes"   className="hover:text-slate-400 transition-colors">Game Modes</a>
+            <Link href="/privacy-policy"   className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
+            <Link href="/terms-&-conditions"     className="hover:text-slate-400 transition-colors">Terms of Service</Link>
           </div>
         </div>
       </footer>

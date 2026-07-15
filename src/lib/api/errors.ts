@@ -116,6 +116,7 @@ function statusForCode(code: string): number {
       return 403;
 
     case 'MISSING_ID_TOKEN':
+    case 'MISSING_EMAIL_TOKEN':
     case 'MISSING_USERNAME':
     case 'BANK_LIMIT_REACHED':
     case 'MISSING_BANK_FIELD':

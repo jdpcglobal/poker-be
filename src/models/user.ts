@@ -16,7 +16,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 export type DeviceType = 'android' | 'ios' | 'unknown';
-export type AuthProviderName = 'google';
+export type AuthProviderName = 'google' | 'email';
 
 /**
  * One linked external auth account. Today only 'google' is supported.
@@ -51,7 +51,7 @@ const AuthProviderSchema = new Schema<IAuthProvider>(
   {
     provider: {
       type: String,
-      enum: ['google'],
+      enum: ['google', 'email'],
       required: true,
     },
     providerId: {
