@@ -306,8 +306,9 @@ export default function HomePage() {
             <a href="#features"     className="hover:text-slate-400 transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-slate-400 transition-colors">How It Works</a>
             <a href="#game-modes"   className="hover:text-slate-400 transition-colors">Game Modes</a>
-            <Link href="/privacy-policy"   className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
-            <Link href="/terms-&-conditions"     className="hover:text-slate-400 transition-colors">Terms of Service</Link>
+            <Link href="/privacy"        className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
+            <Link href="/terms"          className="hover:text-slate-400 transition-colors">Terms of Service</Link>
+            <Link href="/delete-account" className="hover:text-slate-400 transition-colors">Delete Account</Link>
           </div>
         </div>
       </footer>
