@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
           <span className="text-2xl">♠</span>
           <span className="text-lg font-semibold tracking-wide">Poker 77</span>
         </Link>
-        <Link href="/privacy" className="text-sm text-slate-400 hover:text-white transition-colors">
+        <Link href="/privacy-policy" className="text-sm text-slate-400 hover:text-white transition-colors">
           Privacy Policy
         </Link>
       </nav>
@@ -228,8 +228,8 @@ export default function TermsOfServicePage() {
           </Link>
           <p>&copy; {new Date().getFullYear()} JDPC Global Pvt Ltd. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="text-indigo-400">Terms of Service</Link>
+            <Link href="/privacy-policy" className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
+            <Link href="/terms-&-conditions" className="text-indigo-400">Terms of Service</Link>
           </div>
         </div>
       </footer>
